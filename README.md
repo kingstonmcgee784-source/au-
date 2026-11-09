@@ -20,7 +20,12 @@ Coins, wins and upgrades are saved with a DataStore.
 
 The whole world is built by script, so there are no models to import.
 
-### Option A: Rojo (recommended)
+### Option A: Open the place file (easiest)
+
+Download `MeteorMayhem.rbxlx` from this repo and double-click it (or use
+**File > Open from File** in Roblox Studio), then press Play.
+
+### Option B: Rojo
 
 Install [Rojo](https://rojo.space), then from this folder:
 
@@ -31,7 +36,7 @@ rojo build -o MeteorMayhem.rbxlx
 Open `MeteorMayhem.rbxlx` in Roblox Studio and press Play. Or run `rojo serve`
 and connect with the Rojo Studio plugin to live-sync edits.
 
-### Option B: Copy and paste
+### Option C: Copy and paste
 
 In a new Baseplate place in Studio (you can delete the Baseplate and its SpawnLocation):
 
