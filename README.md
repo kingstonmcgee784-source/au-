@@ -58,3 +58,28 @@ Without that the game still runs; it just doesn't save.
 
 Everything adjustable (round length, meteor speed, arena size, coin values,
 upgrade costs) lives in `src/shared/Config.luau`.
+
+## MCP server
+
+`mcp_server/server.py` is a [Model Context Protocol](https://modelcontextprotocol.io)
+server that lets an AI assistant such as Claude work on the game for you.
+
+| Tool          | What it does                                                    |
+| ------------- | --------------------------------------------------------------- |
+| `get_config`  | Lists every numeric game setting                                |
+| `set_config`  | Changes one setting in `src/shared/Config.luau`                 |
+| `read_script` | Returns the source of the `config`, `server` or `client` script |
+| `build_place` | Rebuilds `MeteorMayhem.rbxlx` from the scripts in `src/`        |
+
+Setup (needs Python 3.10+):
+
+```bash
+pip install -r mcp_server/requirements.txt
+```
+
+Claude Code picks the server up automatically from `.mcp.json` when you start
+it in this folder. For other MCP clients, register the command
+`python3 mcp_server/server.py` (stdio transport) with this folder as the
+working directory.
+
+Then ask things like "make rounds 90 seconds and rebuild the place file".
