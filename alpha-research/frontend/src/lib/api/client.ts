@@ -9,6 +9,7 @@
 import type {
   DataResponse,
   FinancialStatement,
+  FinancialsSyncResult,
   HealthResponse,
   MarketOverview,
   PeriodType,
@@ -107,6 +108,11 @@ export const api = {
 
   syncPrices: (symbol: string) =>
     request<DataResponse<PriceSyncResult>>(`/stocks/${ticker(symbol)}/sync-prices`, {
+      method: "POST",
+    }),
+
+  syncFinancials: (symbol: string) =>
+    request<DataResponse<FinancialsSyncResult>>(`/stocks/${ticker(symbol)}/sync-financials`, {
       method: "POST",
     }),
 

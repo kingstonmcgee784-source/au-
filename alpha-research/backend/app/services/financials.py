@@ -35,8 +35,8 @@ def get_statements(
     if not rows:
         return unavailable(
             UnavailableReason.NO_STORED_DATA,
-            f"No financial statements are stored for {ticker}. "
-            "Statement ingestion has not been built yet.",
+            f"No {' '.join(filter(None, [period_type, statement_type, 'statements']))} "
+            f"are stored for {ticker}. Use Load financials to fetch them from SEC EDGAR.",
         )
     newest = max(row.retrieved_at for row in rows)
     return ok(

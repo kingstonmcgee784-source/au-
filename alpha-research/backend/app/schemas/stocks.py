@@ -36,6 +36,16 @@ class PriceSyncResult(BaseModel):
     last_date: date | None
 
 
+class FinancialsSyncResult(BaseModel):
+    ticker: str
+    cik: int
+    company_name: str
+    statements_stored: int
+    quarterly_periods: int
+    annual_periods: int
+    latest_period_end: date | None
+
+
 class FinancialStatementOut(ORMModel):
     statement_type: str
     period_type: str
@@ -45,6 +55,7 @@ class FinancialStatementOut(ORMModel):
     filing_date: date | None
     currency: str
     line_items: dict[str, float | None]
+    derived_items: list[str]
     source: str
     retrieved_at: datetime
 

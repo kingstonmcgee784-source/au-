@@ -13,6 +13,7 @@ _TEST_DIR = Path(tempfile.mkdtemp(prefix="alpha_research_tests_"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(_TEST_DIR / 'test.db').as_posix()}"
 os.environ["ENVIRONMENT"] = "test"
 os.environ["MARKET_DATA_PROVIDER"] = "none"
+os.environ["SEC_USER_AGENT"] = ""
 os.environ["AI_PROVIDER"] = "none"
 
 import pytest  # noqa: E402

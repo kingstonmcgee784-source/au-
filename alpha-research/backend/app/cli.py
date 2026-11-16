@@ -3,6 +3,7 @@
 Usage, from the backend directory:
 
     python -m app.cli sync-prices MSFT LIVN PLAB
+    python -m app.cli sync-financials MSFT LIVN PLAB
 """
 
 import argparse
@@ -11,9 +12,9 @@ import sys
 from app.core.config import get_settings
 from app.db.migrations import upgrade_to_head
 from app.db.session import SessionLocal
-from app.providers.registry import get_market_data_provider
+from app.providers.registry import get_fundamentals_client, get_market_data_provider
 from app.schemas.common import DataStatus, normalize_ticker
-from app.services.ingestion import sync_prices
+from app.services.ingestion import sync_financials, sync_prices
 
 
 def _sync_prices(tickers: list[str]) -> int:
@@ -42,14 +43,44 @@ def _sync_prices(tickers: list[str]) -> int:
     return 1 if failures else 0
 
 
+def _sync_financials(tickers: list[str]) -> int:
+    settings = get_settings()
+    upgrade_to_head(settings.database_url)
+    source = get_fundamentals_client(settings)
+    failures = 0
+    with SessionLocal() as db:
+        for raw in tickers:
+            try:
+                ticker = normalize_ticker(raw)
+            except ValueError as exc:
+                print(f"{raw}: {exc}")
+                failures += 1
+                continue
+            result = sync_financials(db, source, ticker)
+            if result.status == DataStatus.OK and result.data:
+                d = result.data
+                print(
+                    f"{ticker}: {d.statements_stored} statements ({d.quarterly_periods} quarters, "
+                    f"{d.annual_periods} years), latest period {d.latest_period_end}"
+                )
+            else:
+                print(f"{ticker}: not synced ({result.reason}): {result.message}")
+                failures += 1
+    return 1 if failures else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
     sync = commands.add_parser("sync-prices", help="Load daily prices for tickers")
     sync.add_argument("tickers", nargs="+")
+    fin = commands.add_parser("sync-financials", help="Load SEC financial statements for tickers")
+    fin.add_argument("tickers", nargs="+")
     args = parser.parse_args(argv)
     if args.command == "sync-prices":
         return _sync_prices(args.tickers)
+    if args.command == "sync-financials":
+        return _sync_financials(args.tickers)
     return 2
 
 

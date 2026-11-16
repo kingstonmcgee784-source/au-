@@ -69,7 +69,7 @@ class suffix (`MSFT`, `BRK.B`, `BF-B`).
   "version": "0.1.0",
   "environment": "development",
   "database": {"connected": true, "revision": "0001", "head_revision": "0001", "up_to_date": true, "error": null},
-  "integrations": {"market_data": "not_configured", "ai_research": "not_configured"}
+  "integrations": {"market_data": "configured", "fundamentals": "configured", "ai_research": "not_configured"}
 }
 ```
 
@@ -83,6 +83,7 @@ class suffix (`MSFT`, `BRK.B`, `BF-B`).
 | `GET /stocks/{ticker}` | `StockSummary` | From the database, otherwise from the provider |
 | `GET /stocks/{ticker}/quote` | `Quote` | From the provider, cached for 60 seconds |
 | `POST /stocks/{ticker}/sync-prices` | `PriceSyncResult` | Fetches daily bars from the provider and stores the ones not stored yet |
+| `POST /stocks/{ticker}/sync-financials` | `FinancialsSyncResult` | Fetches statements from SEC EDGAR and stores them, replacing earlier copies of the same periods |
 | `GET /stocks/{ticker}/financials?statement_type=&period_type=&limit=12` | `FinancialStatement[]` | From the database, newest period first, otherwise `no_stored_data` |
 | `GET /stocks/{ticker}/technicals` | `TechnicalSnapshot` | Calculated from stored daily prices; `insufficient_history` with fewer than 2 bars |
 | `GET /stocks/{ticker}/score` | `StockScore` | Latest stored score, otherwise `no_stored_data` |
@@ -96,8 +97,14 @@ A `PriceSyncResult` has `bars_added`, `bars_stored`, `first_date` and
 `last_date`. The first sync loads `PRICE_HISTORY_YEARS` of history. Later
 syncs request only the days after the newest stored bar.
 
+A `FinancialStatement` has `line_items`, a map of line-item name to value
+(for example `revenue`, `net_income`, `operating_cash_flow`), and
+`derived_items`, which lists the items calculated from year-to-date figures
+rather than reported for that period on their own. `source` is `sec_edgar`.
+`filing_date` is when the period was first filed.
+
 `statement_type` is one of `income`, `balance` or `cashflow`. `period_type`
-is one of `annual`, `quarterly` or `ttm`.
+is one of `annual`, `quarterly` or `ttm` (TTM is not built yet).
 
 In a `TechnicalSnapshot`, each indicator has `name`, `value` and
 `required_bars`. `value` is `null` when the stored history is shorter than

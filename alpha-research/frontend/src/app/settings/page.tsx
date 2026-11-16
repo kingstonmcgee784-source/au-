@@ -27,6 +27,10 @@ export default function SettingsPage() {
                 price history and the market overview
               </li>
               <li>
+                <code className="font-mono text-ink">SEC_USER_AGENT</code>: your name and email,
+                which the SEC requires for loading financial statements from EDGAR
+              </li>
+              <li>
                 <code className="font-mono text-ink">AI_PROVIDER</code> and{" "}
                 <code className="font-mono text-ink">AI_API_KEY</code>: AI research reports
               </li>

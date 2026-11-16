@@ -57,6 +57,9 @@ export function SystemStatusPanel() {
           <Row label="Market data">
             <IntegrationBadge state={state.data.integrations.market_data} />
           </Row>
+          <Row label="Fundamentals (SEC)">
+            <IntegrationBadge state={state.data.integrations.fundamentals} />
+          </Row>
           <Row label="AI research">
             <IntegrationBadge state={state.data.integrations.ai_research} />
           </Row>

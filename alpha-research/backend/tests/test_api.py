@@ -15,6 +15,7 @@ def test_health_reports_migrated_database(client: TestClient) -> None:
     assert body["database"]["revision"] == body["database"]["head_revision"]
     assert body["integrations"] == {
         "market_data": "not_configured",
+        "fundamentals": "not_configured",
         "ai_research": "not_configured",
     }
 

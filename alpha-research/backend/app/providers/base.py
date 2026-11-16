@@ -6,7 +6,7 @@ these protocols and is selected in `app.providers.registry`.
 """
 
 from datetime import date
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
@@ -39,6 +39,18 @@ class PriceBar(BaseModel):
     close: float
     adjusted_close: float | None
     volume: int
+
+
+class FundamentalsSource(Protocol):
+    """Source of reported financial statements (e.g. SEC EDGAR)."""
+
+    name: str
+
+    def lookup(self, ticker: str) -> tuple[int, str]:
+        """Return (CIK, company name) for a ticker."""
+        ...
+
+    def company_facts(self, cik: int) -> dict[str, Any]: ...
 
 
 class MarketDataProvider(Protocol):

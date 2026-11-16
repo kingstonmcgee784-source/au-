@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # How many years of daily prices to load the first time a stock is synced.
     price_history_years: int = Field(default=2, ge=1, le=30)
 
+    # SEC EDGAR fundamentals (free, no key). The SEC requires a User-Agent with
+    # your name and contact email, e.g. "Jane Doe jane@example.com".
+    sec_user_agent: str | None = None
+
     # AI research integration. "none" means AI report generation is unavailable.
     ai_provider: Literal["none"] = "none"
     ai_api_key: SecretStr | None = None
@@ -61,6 +65,17 @@ class Settings(BaseSettings):
                 f"MARKET_DATA_PROVIDER={self.market_data_provider} needs MARKET_DATA_API_KEY to be set"
             )
         return self
+
+    @field_validator("sec_user_agent")
+    @classmethod
+    def _sec_user_agent_has_contact(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        if "@" not in value:
+            raise ValueError(
+                'SEC_USER_AGENT must include a contact email, e.g. "Jane Doe jane@example.com"'
+            )
+        return value.strip()
 
     @property
     def cors_origin_list(self) -> list[str]:

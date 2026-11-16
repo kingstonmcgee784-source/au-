@@ -65,7 +65,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Financials",
     icon: FileSpreadsheet,
     stage: "partial",
-    description: "Income statement, balance sheet and cash flow history.",
+    description: "Income statement, balance sheet and cash flow history from SEC filings.",
   },
   {
     href: "/technical",

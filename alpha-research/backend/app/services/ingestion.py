@@ -10,10 +10,11 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import HistoricalPrice, Stock
-from app.providers.base import MarketDataProvider, ProviderError
+from app.models import FinancialStatement, HistoricalPrice, Stock
+from app.providers.base import FundamentalsSource, MarketDataProvider, ProviderError
+from app.providers.sec_xbrl import parse_company_facts
 from app.schemas.common import DataResponse, UnavailableReason, ok, unavailable
-from app.schemas.stocks import PriceSyncResult
+from app.schemas.stocks import FinancialsSyncResult, PriceSyncResult
 from app.services.stocks import find_stock, provider_failure
 
 
@@ -98,4 +99,81 @@ def sync_prices(
         ),
         source=provider.name,
         as_of=datetime.now(UTC),
+    )
+
+
+def sync_financials(
+    db: Session, source: FundamentalsSource | None, ticker: str
+) -> DataResponse[FinancialsSyncResult]:
+    """Load reported financial statements for `ticker` and store them.
+
+    Statements already stored for the same period are replaced, so restated
+    figures from later filings take effect.
+    """
+    if source is None:
+        return unavailable(
+            UnavailableReason.PROVIDER_NOT_CONFIGURED,
+            "Financial statements come from SEC EDGAR, which needs SEC_USER_AGENT "
+            "(your name and email) in backend/.env.",
+        )
+    try:
+        cik, company_name = source.lookup(ticker)
+        facts = source.company_facts(cik)
+    except ProviderError as exc:
+        return provider_failure(exc, ticker)
+
+    parsed = parse_company_facts(facts)
+    if not parsed:
+        return unavailable(
+            UnavailableReason.NO_STORED_DATA,
+            f"The SEC has no 10-K or 10-Q financial data for {ticker} in a format we can read.",
+        )
+
+    stock = find_stock(db, ticker)
+    if stock is None:
+        stock = Stock(ticker=ticker, name=company_name)
+        db.add(stock)
+        db.flush()
+
+    existing = {
+        (row.statement_type, row.period_type, row.period_end): row
+        for row in db.scalars(
+            select(FinancialStatement).where(FinancialStatement.stock_id == stock.id)
+        )
+    }
+    retrieved_at = datetime.now(UTC)
+    for statement in parsed:
+        key = (statement.statement_type, statement.period_type, statement.period_end)
+        row = existing.get(key)
+        if row is None:
+            row = FinancialStatement(
+                stock_id=stock.id,
+                statement_type=statement.statement_type,
+                period_type=statement.period_type,
+                period_end=statement.period_end,
+            )
+            db.add(row)
+        row.fiscal_year = statement.fiscal_year
+        row.fiscal_quarter = statement.fiscal_quarter
+        row.filing_date = statement.filing_date
+        row.currency = "USD"
+        row.line_items = statement.line_items
+        row.derived_items = statement.derived_items
+        row.source = source.name
+        row.retrieved_at = retrieved_at
+    db.commit()
+
+    period_ends = {s.period_end for s in parsed}
+    return ok(
+        FinancialsSyncResult(
+            ticker=ticker,
+            cik=cik,
+            company_name=company_name,
+            statements_stored=len(parsed),
+            quarterly_periods=len({s.period_end for s in parsed if s.period_type == "quarterly"}),
+            annual_periods=len({s.period_end for s in parsed if s.period_type == "annual"}),
+            latest_period_end=max(period_ends),
+        ),
+        source=source.name,
+        as_of=retrieved_at,
     )

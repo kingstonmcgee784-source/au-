@@ -23,6 +23,7 @@ class DatabaseHealth(BaseModel):
 
 class IntegrationStatus(BaseModel):
     market_data: Literal["configured", "not_configured"]
+    fundamentals: Literal["configured", "not_configured"]
     ai_research: Literal["configured", "not_configured"]
 
 
@@ -64,6 +65,7 @@ def health(db: DbSession, settings: AppSettings) -> HealthResponse:
         database=database,
         integrations=IntegrationStatus(
             market_data=integration(settings.market_data_provider),
+            fundamentals="configured" if settings.sec_user_agent else "not_configured",
             ai_research=integration(settings.ai_provider),
         ),
     )

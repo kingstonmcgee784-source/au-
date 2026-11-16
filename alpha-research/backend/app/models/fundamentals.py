@@ -36,6 +36,9 @@ class FinancialStatement(SourcedMixin, Base):
     filing_date: Mapped[date | None] = mapped_column(Date)
     currency: Mapped[str] = mapped_column(String(8), default="USD")
     line_items: Mapped[dict[str, float | None]] = mapped_column(JSON, default=dict)
+    # Line items calculated from other reported figures (e.g. Q4 = year minus
+    # nine months) rather than reported directly for this period.
+    derived_items: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
 
 
 class FinancialMetric(SourcedMixin, Base):

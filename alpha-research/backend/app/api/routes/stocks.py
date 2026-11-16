@@ -4,9 +4,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import AppSettings, DbSession, MarketData, TickerPath
+from app.api.deps import AppSettings, DbSession, Fundamentals, MarketData, TickerPath
 from app.schemas.common import DataResponse
 from app.schemas.stocks import (
+    FinancialsSyncResult,
     FinancialStatementOut,
     PriceSyncResult,
     Quote,
@@ -68,3 +69,11 @@ def sync_prices(
     return ingestion.sync_prices(
         db, provider, ticker, history_years=settings.price_history_years
     )
+
+
+@router.post("/{ticker}/sync-financials", response_model=DataResponse[FinancialsSyncResult])
+def sync_financials(
+    db: DbSession, source: Fundamentals, ticker: TickerPath
+) -> DataResponse[FinancialsSyncResult]:
+    """Fetch reported financial statements from SEC EDGAR and store them."""
+    return ingestion.sync_financials(db, source, ticker)

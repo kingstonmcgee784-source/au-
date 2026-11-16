@@ -37,6 +37,7 @@ export interface HealthResponse {
   };
   integrations: {
     market_data: IntegrationState;
+    fundamentals: IntegrationState;
     ai_research: IntegrationState;
   };
 }
@@ -72,6 +73,16 @@ export interface PriceSyncResult {
   last_date: string | null;
 }
 
+export interface FinancialsSyncResult {
+  ticker: string;
+  cik: number;
+  company_name: string;
+  statements_stored: number;
+  quarterly_periods: number;
+  annual_periods: number;
+  latest_period_end: string | null;
+}
+
 export type StatementType = "income" | "balance" | "cashflow";
 export type PeriodType = "annual" | "quarterly" | "ttm";
 
@@ -84,6 +95,8 @@ export interface FinancialStatement {
   filing_date: string | null;
   currency: string;
   line_items: Record<string, number | null>;
+  /** Line items calculated from other reported figures, e.g. Q4 = year minus nine months. */
+  derived_items: string[];
   source: string;
   retrieved_at: string;
 }
