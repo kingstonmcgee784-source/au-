@@ -70,9 +70,22 @@ def get_profile(
             f"{no_stored_stock(ticker)} No market data provider is configured.",
         )
     try:
-        return ok(provider.get_profile(ticker), source=provider.name)
+        profile = provider.get_profile(ticker)
     except ProviderError as exc:
         return provider_failure(exc, ticker)
+    # Keep it, so later visits do not spend another provider request.
+    db.add(
+        Stock(
+            ticker=ticker,
+            name=profile.name,
+            exchange=profile.exchange,
+            sector=profile.sector,
+            industry=profile.industry,
+            currency=profile.currency,
+        )
+    )
+    db.commit()
+    return ok(profile, source=provider.name)
 
 
 def get_quote(provider: MarketDataProvider | None, ticker: str) -> DataResponse[Quote]:

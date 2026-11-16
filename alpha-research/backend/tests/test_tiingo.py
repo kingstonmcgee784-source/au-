@@ -139,3 +139,15 @@ def test_search_skips_inactive_and_foreign_listings() -> None:
         }
     )
     assert [s.ticker for s in provider.search("apple", 10)] == ["AAPL"]
+
+
+def test_rate_limit_serves_cached_quote() -> None:
+    responses = iter([httpx.Response(200, json=[{"tngoLast": 5.0, "prevClose": 4.0}]),
+                      httpx.Response(429, json={})])
+    provider = TiingoProvider(
+        "k",
+        quote_cache_seconds=0,  # always try the network
+        transport=httpx.MockTransport(lambda request: next(responses)),
+    )
+    first = provider.get_quote("SPY")
+    assert provider.get_quote("SPY") == first  # 429, but the cached quote is returned

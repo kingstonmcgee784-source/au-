@@ -76,13 +76,13 @@ def test_sync_is_incremental(provider: FakeProvider, db: Session) -> None:
     added_first = first.data.bars_added
     assert first.data.last_date == date(2026, 6, 1)
 
-    second = sync_prices(db, provider, "LIVN", history_years=2, today=TODAY)
+    second = sync_prices(db, provider, "LIVN", history_years=2, today=TODAY, force=True)
     assert second.data is not None
     # Only days after the newest stored bar are requested and stored.
     assert provider.price_requests[-1][1] == date(2026, 6, 2)
     assert second.data.bars_stored == added_first + second.data.bars_added
 
-    again = sync_prices(db, provider, "LIVN", history_years=2, today=TODAY)
+    again = sync_prices(db, provider, "LIVN", history_years=2, today=TODAY, force=True)
     assert again.data is not None and again.data.bars_added == 0
     assert db.scalar(select(Stock).where(Stock.ticker == "LIVN")).name == "LIVN Test Co"
 
@@ -96,3 +96,20 @@ def test_sync_failure_stores_nothing(provider: FakeProvider, db: Session) -> Non
 def test_sync_without_provider(client: TestClient) -> None:
     body = client.post("/api/v1/stocks/LIVN/sync-prices").json()
     assert body["reason"] == "provider_not_configured"
+
+
+def test_recent_sync_is_not_repeated(provider: FakeProvider, db: Session) -> None:
+    """Within the refresh interval, a sync spends no provider requests."""
+    sync_prices(db, provider, "LIVN", history_years=2, today=TODAY)
+    requests_before = len(provider.price_requests)
+    result = sync_prices(db, provider, "LIVN", history_years=2, today=TODAY)
+    assert result.data is not None and result.data.bars_added == 0
+    assert result.data.bars_stored > 0
+    assert len(provider.price_requests) == requests_before
+
+
+def test_profile_is_stored_after_first_lookup(
+    client: TestClient, provider: FakeProvider, db: Session
+) -> None:
+    assert client.get("/api/v1/stocks/LIVN").json()["source"] == "fake"
+    assert client.get("/api/v1/stocks/LIVN").json()["source"] == "local_database"

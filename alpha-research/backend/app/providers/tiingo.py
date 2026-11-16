@@ -8,7 +8,9 @@ Endpoints used:
   - GET /iex/{ticker}                      latest IEX-derived price
   - GET /tiingo/utilities/search?query=    ticker search (beta at Tiingo)
 
-The free plan has request limits, so quotes are cached briefly in memory.
+The free plan allows 50 requests an hour, so quotes are cached in memory. If
+the limit is reached, the last cached quote is returned (its timestamp shows
+its age) rather than an error.
 """
 
 import logging
@@ -42,7 +44,7 @@ class TiingoProvider:
         api_key: str,
         *,
         timeout_seconds: float = 15.0,
-        quote_cache_seconds: float = 60.0,
+        quote_cache_seconds: float = 600.0,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         if not api_key:
@@ -104,7 +106,13 @@ class TiingoProvider:
             if cached and now - cached[0] < self._quote_cache_seconds:
                 return cached[1]
 
-        rows = _as_list(self._get_json(f"/iex/{_path(ticker)}", ticker=ticker))
+        try:
+            rows = _as_list(self._get_json(f"/iex/{_path(ticker)}", ticker=ticker))
+        except ProviderRateLimitError:
+            if cached:
+                logger.info("Tiingo rate limit reached; serving cached quote for %s", ticker)
+                return cached[1]
+            raise
         if not rows:
             raise TickerNotFoundError(f"Tiingo has no IEX price for {ticker}")
         row = rows[0]

@@ -17,6 +17,10 @@ from app.schemas.common import DataResponse, UnavailableReason, ok, unavailable
 from app.schemas.stocks import FinancialsSyncResult, PriceSyncResult
 from app.services.stocks import find_stock, provider_failure
 
+# Prices are daily bars: refreshing more often than this only spends the
+# provider's request allowance (Tiingo's free plan allows 50 an hour).
+PRICE_REFRESH_INTERVAL = timedelta(hours=6)
+
 
 def sync_prices(
     db: Session,
@@ -25,6 +29,7 @@ def sync_prices(
     *,
     history_years: int,
     today: date | None = None,
+    force: bool = False,
 ) -> DataResponse[PriceSyncResult]:
     """Store any daily bars for `ticker` that are not stored yet.
 
@@ -39,18 +44,23 @@ def sync_prices(
         )
     today = today or datetime.now(UTC).date()
 
-    try:
-        profile = provider.get_profile(ticker)
-    except ProviderError as exc:
-        return provider_failure(exc, ticker)
-
     stock = find_stock(db, ticker)
     if stock is None:
-        stock = Stock(ticker=ticker, name=profile.name)
+        try:
+            profile = provider.get_profile(ticker)
+        except ProviderError as exc:
+            return provider_failure(exc, ticker)
+        stock = Stock(ticker=ticker, name=profile.name, exchange=profile.exchange)
         db.add(stock)
-    stock.name = profile.name
-    stock.exchange = profile.exchange or stock.exchange
-    db.flush()
+        db.flush()
+    elif not force:
+        last_retrieved = db.scalar(
+            select(func.max(HistoricalPrice.retrieved_at)).where(
+                HistoricalPrice.stock_id == stock.id
+            )
+        )
+        if last_retrieved and datetime.now(UTC) - last_retrieved < PRICE_REFRESH_INTERVAL:
+            return _price_summary(db, provider.name, ticker, stock.id, added=0)
 
     newest = db.scalar(
         select(func.max(HistoricalPrice.date)).where(HistoricalPrice.stock_id == stock.id)
@@ -85,20 +95,26 @@ def sync_prices(
             )
             added += 1
     db.commit()
+    return _price_summary(db, provider.name, ticker, stock.id, added=added)
 
-    count, first, last = db.execute(
+
+def _price_summary(
+    db: Session, source: str, ticker: str, stock_id: int, *, added: int
+) -> DataResponse[PriceSyncResult]:
+    count, first, last, retrieved = db.execute(
         select(
             func.count(HistoricalPrice.id),
             func.min(HistoricalPrice.date),
             func.max(HistoricalPrice.date),
-        ).where(HistoricalPrice.stock_id == stock.id)
+            func.max(HistoricalPrice.retrieved_at),
+        ).where(HistoricalPrice.stock_id == stock_id)
     ).one()
     return ok(
         PriceSyncResult(
             ticker=ticker, bars_added=added, bars_stored=count, first_date=first, last_date=last
         ),
-        source=provider.name,
-        as_of=datetime.now(UTC),
+        source=source,
+        as_of=retrieved or datetime.now(UTC),
     )
 
 

@@ -107,8 +107,12 @@ Notes on the data:
   not the consolidated tape, and the app labels it that way.
 - **The market overview** shows the SPY, QQQ, IWM and DIA ETFs as proxies
   for the indexes, labelled as ETFs.
-- **Limits:** Tiingo's free plan caps the number of requests, so quotes are
-  cached for 60 seconds.
+- **Request limits:** Tiingo's free plan allows 50 requests an hour and 1,000 a
+  day. To stay within that:
+  - Quotes are cached for 10 minutes. When the limit is hit, the last cached
+    quote is shown with its timestamp.
+  - Company details are stored after the first lookup.
+  - A stock's prices are refreshed at most every 6 hours.
 
 ## Connecting financial statements (SEC EDGAR)
 

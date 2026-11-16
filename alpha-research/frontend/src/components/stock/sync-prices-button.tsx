@@ -13,8 +13,10 @@ export function SyncPricesButton({ ticker, onSynced }: { ticker: string; onSynce
       busyLabel="Loading prices…"
       run={() => api.syncPrices(ticker)}
       describe={(d) =>
-        `${d.bars_added} new daily bars stored (${d.bars_stored} total, ` +
-        `${formatDate(d.first_date)} to ${formatDate(d.last_date)}).`
+        (d.bars_added > 0
+          ? `${d.bars_added} new daily bars stored`
+          : "Prices are already up to date (refreshed at most every 6 hours)") +
+        ` · ${d.bars_stored} bars from ${formatDate(d.first_date)} to ${formatDate(d.last_date)}.`
       }
       onSynced={onSynced}
     />
