@@ -405,7 +405,7 @@ The main risks are margin compression (RSKD), Q4 deceleration and tax-flattered 
 Invalidation triggers (inference built on cited data above):
 - **RSKD:** gross margin falls below about 43% again, or Digital Finance volume churns; also a close below the 50-day ($8.00). Data: margin 43% vs 50% a year ago ([release](https://finviz.com/news/420836/riskified-reports-strong-third-quarter-of-2026-with-accelerating-revenue-and-gross-profit-growth)).
 - **FLYW:** organic growth below the guided 25–27%; high short interest (10.9%) amplifies downside ([StockAnalysis](https://stockanalysis.com/stocks/flyw/statistics/)). Exposure to international-student visa policy is my inference.
-- **CCSI:** corporate growth slows below mid-single digits, or SoHo declines accelerate. Leverage: $560M debt vs $108M TTM FCF... more precisely FCF TTM $109.8M ([StockAnalysis](https://stockanalysis.com/stocks/ccsi/statistics/)).
+- **CCSI:** corporate growth slows below mid-single digits, or SoHo declines accelerate. Leverage: $559.9M debt vs $109.8M TTM FCF ([StockAnalysis](https://stockanalysis.com/stocks/ccsi/statistics/)).
 - **OBT:** NPLs keep rising (0.98% vs 0.63% a year earlier) or the wealth AUM decline (-13% YTD) continues ([8-K](https://www.sec.gov/Archives/edgar/data/0001754226/000094337426000458/ex99-1_8k102826.htm)).
 - **ZETA:** organic growth falls below about 20%, or SBC/dilution rises. SBC is 10.1% of revenue (calc) ([8-K](https://www.sec.gov/Archives/edgar/data/0001851003/000119312526453558/zeta-ex99_1.htm)).
 
