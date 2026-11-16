@@ -12,6 +12,7 @@ import type {
   HealthResponse,
   MarketOverview,
   PeriodType,
+  PriceSyncResult,
   Quote,
   RankingEntry,
   ResearchReport,
@@ -103,6 +104,11 @@ export const api = {
       `/stocks/${ticker(symbol)}/financials${query}`,
     );
   },
+
+  syncPrices: (symbol: string) =>
+    request<DataResponse<PriceSyncResult>>(`/stocks/${ticker(symbol)}/sync-prices`, {
+      method: "POST",
+    }),
 
   technicals: (symbol: string) =>
     request<DataResponse<TechnicalSnapshot>>(`/stocks/${ticker(symbol)}/technicals`),

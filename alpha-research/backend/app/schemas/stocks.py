@@ -21,9 +21,19 @@ class Quote(BaseModel):
     price: float
     change: float | None
     change_percent: float | None
+    previous_close: float | None
     volume: int | None
     timestamp: datetime
-    is_delayed: bool
+    # Which price feed this is, so nobody mistakes it for a consolidated quote.
+    feed: str
+
+
+class PriceSyncResult(BaseModel):
+    ticker: str
+    bars_added: int
+    bars_stored: int
+    first_date: date | None
+    last_date: date | None
 
 
 class FinancialStatementOut(ORMModel):

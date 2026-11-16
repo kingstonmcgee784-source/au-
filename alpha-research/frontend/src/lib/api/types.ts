@@ -9,7 +9,9 @@ export type UnavailableReason =
   | "provider_not_configured"
   | "ai_not_configured"
   | "no_stored_data"
-  | "insufficient_history";
+  | "insufficient_history"
+  | "unknown_ticker"
+  | "provider_error";
 
 /** Envelope used by every data endpoint. `data` is null when unavailable. */
 export interface DataResponse<T> {
@@ -55,9 +57,19 @@ export interface Quote {
   price: number;
   change: number | null;
   change_percent: number | null;
+  previous_close: number | null;
   volume: number | null;
   timestamp: string;
-  is_delayed: boolean;
+  /** Which price feed this is, e.g. a single-venue reference price. */
+  feed: string;
+}
+
+export interface PriceSyncResult {
+  ticker: string;
+  bars_added: number;
+  bars_stored: number;
+  first_date: string | null;
+  last_date: string | null;
 }
 
 export type StatementType = "income" | "balance" | "cashflow";

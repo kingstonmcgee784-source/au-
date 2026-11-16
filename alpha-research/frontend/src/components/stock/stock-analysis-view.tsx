@@ -80,8 +80,10 @@ function QuotePanel({ ticker }: { ticker: string }) {
               {formatNumber(quote.change)} ({formatPercent(quote.change_percent)})
             </p>
             <p className="mt-2 text-xs text-ink-muted">
-              Volume {formatCompact(quote.volume)} · {quote.is_delayed ? "Delayed" : "Real-time"}
+              Previous close {formatNumber(quote.previous_close)} · Volume{" "}
+              {formatCompact(quote.volume)}
             </p>
+            <p className="mt-1 text-[11px] text-ink-faint">Feed: {quote.feed}</p>
             <SourceNote source={response.source} asOf={response.as_of} />
           </>
         )}

@@ -9,6 +9,7 @@ import { api } from "@/lib/api/client";
 import { formatDate, formatNumber, indicatorLabel } from "@/lib/format";
 import { useApi } from "@/lib/hooks/use-api";
 
+import { SyncPricesButton } from "./sync-prices-button";
 import { TickerForm, useTickerParam } from "./ticker-form";
 
 export function TechnicalView() {
@@ -19,7 +20,10 @@ export function TechnicalView() {
 
   return (
     <div className="space-y-4">
-      <TickerForm key={ticker ?? ""} current={ticker} />
+      <div className="flex flex-wrap items-start gap-4">
+        <TickerForm key={ticker ?? ""} current={ticker} />
+        {ticker && <SyncPricesButton key={`sync-${ticker}`} ticker={ticker} onSynced={reload} />}
+      </div>
       {ticker ? (
         <Panel title={`${ticker} indicators`} icon={CandlestickChart}>
           <DataView state={state} onRetry={reload} loadingLabel="Calculating indicators">

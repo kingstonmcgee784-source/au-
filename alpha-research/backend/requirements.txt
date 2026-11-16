@@ -4,7 +4,7 @@ pydantic==2.14.3
 pydantic-settings==2.16.3
 SQLAlchemy==2.1.8
 alembic==1.20.1
+httpx==0.28.1
 
 # Testing
 pytest==9.2.0
-httpx==0.28.1

@@ -31,6 +31,8 @@ When the data cannot be provided, `status` is `"unavailable"`, `data` is
 | `ai_not_configured` | Needs an AI provider, and none is configured |
 | `no_stored_data` | Nothing is stored for this request yet |
 | `insufficient_history` | Some price history is stored, but too little to calculate from |
+| `unknown_ticker` | The data provider does not recognize the ticker |
+| `provider_error` | The provider failed: bad API key, rate limit, timeout or outage (see `message`) |
 
 `message` is a human-readable explanation. Clients must treat `unavailable`
 as "no data", never as zero.
@@ -77,12 +79,22 @@ class suffix (`MSFT`, `BRK.B`, `BF-B`).
 
 | Method & path | Returns (`data`) | Current behavior |
 |---|---|---|
-| `GET /stocks/search?q=&limit=20` | `StockSummary[]` | Matches ticker or name in the local `stocks` table; `provider_not_configured` when nothing matches |
-| `GET /stocks/{ticker}` | `StockSummary` | From the database, otherwise `no_stored_data` |
-| `GET /stocks/{ticker}/quote` | `Quote` | `provider_not_configured` |
+| `GET /stocks/search?q=&limit=20` | `StockSummary[]` | Searches the provider when configured (falling back to the local `stocks` table if the provider fails); without a provider, searches the local table and reports `provider_not_configured` when nothing matches |
+| `GET /stocks/{ticker}` | `StockSummary` | From the database, otherwise from the provider |
+| `GET /stocks/{ticker}/quote` | `Quote` | From the provider, cached for 60 seconds |
+| `POST /stocks/{ticker}/sync-prices` | `PriceSyncResult` | Fetches daily bars from the provider and stores the ones not stored yet |
 | `GET /stocks/{ticker}/financials?statement_type=&period_type=&limit=12` | `FinancialStatement[]` | From the database, newest period first, otherwise `no_stored_data` |
 | `GET /stocks/{ticker}/technicals` | `TechnicalSnapshot` | Calculated from stored daily prices; `insufficient_history` with fewer than 2 bars |
 | `GET /stocks/{ticker}/score` | `StockScore` | Latest stored score, otherwise `no_stored_data` |
+
+A `Quote` has `price`, `change`, `change_percent`, `previous_close`,
+`volume` and `timestamp`. It also has `feed`, which names the price feed.
+With Tiingo that is an IEX reference price from a single venue, not the
+consolidated tape.
+
+A `PriceSyncResult` has `bars_added`, `bars_stored`, `first_date` and
+`last_date`. The first sync loads `PRICE_HISTORY_YEARS` of history. Later
+syncs request only the days after the newest stored bar.
 
 `statement_type` is one of `income`, `balance` or `cashflow`. `period_type`
 is one of `annual`, `quarterly` or `ttm`.
@@ -114,8 +126,9 @@ The scoring weights are:
 
 ### Market
 
-`GET /market/overview` returns an envelope of `MarketOverview` (index levels).
-It currently returns `provider_not_configured`.
+`GET /market/overview` returns an envelope of `MarketOverview`. Index levels
+need a licensed index feed, so the entries are the SPY, QQQ, IWM and DIA ETFs.
+Their names say "ETF" so they are not mistaken for the indexes.
 
 ### Research reports
 

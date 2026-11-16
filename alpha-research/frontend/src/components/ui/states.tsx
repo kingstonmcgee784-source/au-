@@ -42,6 +42,8 @@ const REASON_TITLE: Record<UnavailableReason, string> = {
   ai_not_configured: "AI research not connected",
   no_stored_data: "No data stored yet",
   insufficient_history: "Not enough price history",
+  unknown_ticker: "Ticker not recognized",
+  provider_error: "Data provider error",
 };
 
 /** Shown when the backend answers `status: "unavailable"`. Never shows numbers. */

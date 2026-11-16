@@ -72,7 +72,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Technical Analysis",
     icon: CandlestickChart,
     stage: "partial",
-    description: "Moving averages, RSI and MACD calculated from stored prices.",
+    description: "Load daily prices, then calculate moving averages, RSI and MACD from them.",
   },
   {
     href: "/news",

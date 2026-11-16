@@ -3,10 +3,11 @@
 An AI-assisted stock research and screening platform: a FastAPI backend with a
 SQLite database, and a Next.js research dashboard.
 
-**Status: foundation milestone.** The application structure, database, API and
-dashboard work end to end. No market data, fundamentals or AI provider is
-connected yet. Every endpoint that needs one returns `status: "unavailable"`
-with a reason. The platform never shows invented prices or metrics.
+**Status: foundation plus market data.** The application structure, database,
+API and dashboard work end to end. Tiingo can be connected for quotes and
+daily price history. Fundamentals and AI research are not connected yet.
+Every endpoint that lacks data returns `status: "unavailable"` with a reason.
+The platform never shows invented prices or metrics.
 
 ## Layout
 
@@ -77,6 +78,37 @@ The frontend calls `/api/backend/*`, which Next.js proxies to the backend's
 `/api/v1/*`. The browser never talks to the backend directly, and API keys
 live only in `backend/.env`.
 
+## Connecting market data (Tiingo)
+
+1. Create a free account at https://www.tiingo.com and copy your API token
+   (Account > API > Token).
+2. In `backend/.env`, set:
+   ```
+   MARKET_DATA_PROVIDER=tiingo
+   MARKET_DATA_API_KEY=your-token-here
+   ```
+3. Restart the backend. **Settings** in the app should show Market data as
+   *Connected*.
+
+Quotes and the market overview then load live. To use technical analysis,
+load a stock's daily prices, either with **Load price history** on the
+Technical Analysis page or from the command line:
+
+```bash
+cd alpha-research/backend && .venv/bin/python -m app.cli sync-prices MSFT LIVN PLAB
+```
+
+The first sync loads `PRICE_HISTORY_YEARS` of history. Later syncs only fetch
+new days.
+
+Notes on the data:
+- **Quotes** use Tiingo's IEX reference price. That is a single-venue price,
+  not the consolidated tape, and the app labels it that way.
+- **The market overview** shows the SPY, QQQ, IWM and DIA ETFs as proxies
+  for the indexes, labelled as ETFs.
+- **Limits:** Tiingo's free plan caps the number of requests, so quotes are
+  cached for 60 seconds.
+
 ## Database
 
 SQLite at `backend/data/alpha_research.db` by default. Schema changes go
@@ -108,10 +140,11 @@ cd alpha-research/frontend && npm run lint && npm run build
 |---|---|
 | Health check: API, database connection, schema revision, integration status | Working |
 | Watchlists: create, delete, add and remove tickers | Working, stored in SQLite |
-| Technical indicators (EMA 9/20/21, SMA 50/100/200, RSI 14, MACD) | Calculated correctly from stored prices; no price ingestion yet |
+| Technical indicators (EMA 9/20/21, SMA 50/100/200, RSI 14, MACD) | Calculated from stored Tiingo prices |
 | Scoring methodology (weights, bands) and rankings from stored scores | Working; no scores are produced yet |
-| Stock search and profile from the local database | Working; the stocks table is empty until ingestion exists |
-| Quotes, market overview | Report `provider_not_configured` |
+| Stock search and profile | From Tiingo when configured, otherwise the local database |
+| Quotes, market overview (ETF proxies) | Live from Tiingo when configured |
+| Daily price history | Loaded from Tiingo into SQLite on request; incremental after the first load |
 | Financial statements | Read from the database; report `no_stored_data` until ingestion exists |
 | AI report generation | Reports `ai_not_configured` |
 | Screener, News & Catalysts, Backtesting, Performance Tracking | Pages describe the planned feature; not built |

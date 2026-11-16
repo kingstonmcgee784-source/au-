@@ -4,16 +4,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import DbSession, MarketData, TickerPath
+from app.api.deps import AppSettings, DbSession, MarketData, TickerPath
 from app.schemas.common import DataResponse
 from app.schemas.stocks import (
     FinancialStatementOut,
+    PriceSyncResult,
     Quote,
     StockScoreOut,
     StockSummary,
     TechnicalSnapshot,
 )
-from app.services import financials, scores, stocks, technicals
+from app.services import financials, ingestion, scores, stocks, technicals
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -29,8 +30,8 @@ def search(
 
 
 @router.get("/{ticker}", response_model=DataResponse[StockSummary])
-def profile(db: DbSession, ticker: TickerPath) -> DataResponse[StockSummary]:
-    return stocks.get_profile(db, ticker)
+def profile(db: DbSession, provider: MarketData, ticker: TickerPath) -> DataResponse[StockSummary]:
+    return stocks.get_profile(db, provider, ticker)
 
 
 @router.get("/{ticker}/quote", response_model=DataResponse[Quote])
@@ -57,3 +58,13 @@ def technical_snapshot(db: DbSession, ticker: TickerPath) -> DataResponse[Techni
 @router.get("/{ticker}/score", response_model=DataResponse[StockScoreOut])
 def score(db: DbSession, ticker: TickerPath) -> DataResponse[StockScoreOut]:
     return scores.get_latest_score(db, ticker)
+
+
+@router.post("/{ticker}/sync-prices", response_model=DataResponse[PriceSyncResult])
+def sync_prices(
+    db: DbSession, provider: MarketData, settings: AppSettings, ticker: TickerPath
+) -> DataResponse[PriceSyncResult]:
+    """Fetch daily prices from the market data provider and store the new ones."""
+    return ingestion.sync_prices(
+        db, provider, ticker, history_years=settings.price_history_years
+    )

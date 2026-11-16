@@ -22,9 +22,9 @@ export default function SettingsPage() {
             </p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                <code className="font-mono text-ink">MARKET_DATA_PROVIDER</code> and{" "}
-                <code className="font-mono text-ink">MARKET_DATA_API_KEY</code>: quotes, prices
-                and index levels
+                <code className="font-mono text-ink">MARKET_DATA_PROVIDER=tiingo</code> and{" "}
+                <code className="font-mono text-ink">MARKET_DATA_API_KEY</code>: quotes, daily
+                price history and the market overview
               </li>
               <li>
                 <code className="font-mono text-ink">AI_PROVIDER</code> and{" "}

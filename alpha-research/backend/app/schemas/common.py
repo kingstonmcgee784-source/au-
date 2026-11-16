@@ -24,6 +24,8 @@ class UnavailableReason(StrEnum):
     AI_NOT_CONFIGURED = "ai_not_configured"
     NO_STORED_DATA = "no_stored_data"
     INSUFFICIENT_HISTORY = "insufficient_history"
+    UNKNOWN_TICKER = "unknown_ticker"
+    PROVIDER_ERROR = "provider_error"
 
 
 class DataResponse[T](BaseModel):

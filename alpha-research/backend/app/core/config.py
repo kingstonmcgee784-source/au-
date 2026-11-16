@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -37,8 +37,10 @@ class Settings(BaseSettings):
 
     # Market data integration. "none" means no provider is configured and every
     # market-data endpoint reports that data is unavailable.
-    market_data_provider: Literal["none"] = "none"
+    market_data_provider: Literal["none", "tiingo"] = "none"
     market_data_api_key: SecretStr | None = None
+    # How many years of daily prices to load the first time a stock is synced.
+    price_history_years: int = Field(default=2, ge=1, le=30)
 
     # AI research integration. "none" means AI report generation is unavailable.
     ai_provider: Literal["none"] = "none"
@@ -50,6 +52,15 @@ class Settings(BaseSettings):
         if not value.strip():
             raise ValueError("DATABASE_URL must not be empty")
         return value
+
+    @model_validator(mode="after")
+    def _provider_needs_key(self) -> "Settings":
+        key = self.market_data_api_key.get_secret_value().strip() if self.market_data_api_key else ""
+        if self.market_data_provider != "none" and not key:
+            raise ValueError(
+                f"MARKET_DATA_PROVIDER={self.market_data_provider} needs MARKET_DATA_API_KEY to be set"
+            )
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:
