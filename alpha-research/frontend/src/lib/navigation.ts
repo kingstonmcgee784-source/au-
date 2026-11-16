@@ -123,3 +123,10 @@ export function findNavItem(pathname: string): NavItem | undefined {
     item.href === "/" ? pathname === "/" : pathname.startsWith(item.href),
   );
 }
+
+/** Look up a nav item by route. Throws at build time if a page uses an unknown route. */
+export function navItem(href: string): NavItem {
+  const item = NAV_ITEMS.find((candidate) => candidate.href === href);
+  if (!item) throw new Error(`No navigation item for ${href}`);
+  return item;
+}

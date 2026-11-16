@@ -6,6 +6,11 @@ import type { NextConfig } from "next";
 const backendUrl = (process.env.BACKEND_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
+  // The dev server only trusts `localhost` by default; also allow the
+  // loopback IP so http://127.0.0.1:3000 hydrates in development.
+  allowedDevOrigins: ["127.0.0.1"],
+  // Keep the dev-only Next.js badge clear of the sidebar legend.
+  devIndicators: { position: "bottom-right" },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

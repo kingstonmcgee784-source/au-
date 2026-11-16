@@ -2,10 +2,10 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, Date, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, SourcedMixin, TimestampMixin, utcnow
+from app.models.base import Base, SourcedMixin, TimestampMixin, UTCDateTime, utcnow
 
 
 class ResearchReport(TimestampMixin, Base):
@@ -35,7 +35,7 @@ class NewsArticle(SourcedMixin, Base):
     headline: Mapped[str] = mapped_column(String(512))
     url: Mapped[str] = mapped_column(String(1024), unique=True)
     publisher: Mapped[str | None] = mapped_column(String(128))
-    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    published_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
     summary: Mapped[str | None] = mapped_column(Text)
     # earnings | contract | regulatory | analyst | other
     category: Mapped[str | None] = mapped_column(String(32))
@@ -73,4 +73,4 @@ class BacktestResult(Base):
     benchmark: Mapped[str | None] = mapped_column(String(16))
     # Computed statistics, e.g. {"total_return": ..., "max_drawdown": ...}.
     metrics: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)

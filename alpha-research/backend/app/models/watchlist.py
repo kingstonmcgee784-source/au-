@@ -2,10 +2,10 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, utcnow
+from app.models.base import Base, TimestampMixin, UTCDateTime, utcnow
 
 
 class Watchlist(TimestampMixin, Base):
@@ -40,6 +40,6 @@ class WatchlistItem(Base):
     )
     ticker: Mapped[str] = mapped_column(String(16))
     notes: Mapped[str | None] = mapped_column(Text)
-    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
 
     watchlist: Mapped[Watchlist] = relationship(back_populates="items")

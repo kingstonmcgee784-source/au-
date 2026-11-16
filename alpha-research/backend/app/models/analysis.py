@@ -2,10 +2,10 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, Date, Float, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, utcnow
+from app.models.base import Base, UTCDateTime, utcnow
 
 
 class TechnicalIndicator(Base):
@@ -19,7 +19,7 @@ class TechnicalIndicator(Base):
     indicator: Mapped[str] = mapped_column(String(32))  # e.g. "sma_50", "rsi_14"
     date: Mapped[date] = mapped_column(Date, index=True)
     value: Mapped[float | None] = mapped_column(Float)
-    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    calculated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
 
 
 class StockScore(Base):
@@ -36,4 +36,4 @@ class StockScore(Base):
     methodology_version: Mapped[str] = mapped_column(String(16))
     risk_class: Mapped[str | None] = mapped_column(String(16))
     notes: Mapped[str | None]
-    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    calculated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)

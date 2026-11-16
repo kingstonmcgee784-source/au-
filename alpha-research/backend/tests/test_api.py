@@ -161,6 +161,8 @@ def test_watchlist_lifecycle(client: TestClient) -> None:
     created = client.post("/api/v1/watchlists", json={"name": "Core ideas"})
     assert created.status_code == 201
     watchlist_id = created.json()["id"]
+    # Timestamps must carry an explicit UTC offset, even on SQLite.
+    assert created.json()["created_at"].endswith(("Z", "+00:00"))
 
     duplicate = client.post("/api/v1/watchlists", json={"name": "Core ideas"})
     assert duplicate.status_code == 409
