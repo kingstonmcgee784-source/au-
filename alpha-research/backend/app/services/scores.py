@@ -44,8 +44,8 @@ def rankings(db: Session, limit: int) -> DataResponse[list[RankingEntry]]:
     if not rows:
         return unavailable(
             UnavailableReason.NO_STORED_DATA,
-            "No stocks have been scored yet. Scoring needs fundamental and price data, "
-            "which is not ingested yet.",
+            "No stocks have been scored yet. The scoring pipeline, which turns stored prices "
+            "and financial statements into 0-100 scores, is not built yet.",
         )
     entries = [
         RankingEntry(
@@ -77,7 +77,7 @@ def get_latest_score(db: Session, ticker: str) -> DataResponse[StockScoreOut]:
         return unavailable(
             UnavailableReason.NO_STORED_DATA,
             f"No score has been calculated for {ticker}. "
-            "The scoring pipeline needs fundamental and price data first.",
+            "The scoring pipeline is not built yet.",
         )
     return ok(
         StockScoreOut(
