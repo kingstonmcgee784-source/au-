@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* Design tokens. The app is dark-only, like an institutional terminal. */
+@theme {
+  --color-canvas: #090c11;
+  --color-surface: #10141b;
+  --color-surface-raised: #161b24;
+  --color-line: #232a35;
+  --color-line-strong: #2f3846;
+  --color-ink: #e6e9ef;
+  --color-ink-muted: #94a0b4;
+  --color-ink-faint: #64708a;
+  --color-accent: #e0a63a;
+  --color-accent-soft: #e0a63a1f;
+  --color-positive: #34c38f;
+  --color-negative: #f0616d;
+  --color-info: #5aa2f0;
+  --color-info-soft: #5aa2f01f;
+  --color-warning: #e6b450;
+  --color-warning-soft: #e6b4501f;
+
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1, "cv11" 1;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+/* Thin scrollbars that match the dark theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}

@@ -1,0 +1,24 @@
+"""ORM models. Importing this package registers every table on `Base.metadata`."""
+
+from app.models.analysis import StockScore, TechnicalIndicator
+from app.models.base import Base
+from app.models.fundamentals import FinancialMetric, FinancialStatement
+from app.models.research import BacktestResult, NewsArticle, Recommendation, ResearchReport
+from app.models.stock import HistoricalPrice, Stock
+from app.models.watchlist import Watchlist, WatchlistItem
+
+__all__ = [
+    "BacktestResult",
+    "Base",
+    "FinancialMetric",
+    "FinancialStatement",
+    "HistoricalPrice",
+    "NewsArticle",
+    "Recommendation",
+    "ResearchReport",
+    "Stock",
+    "StockScore",
+    "TechnicalIndicator",
+    "Watchlist",
+    "WatchlistItem",
+]

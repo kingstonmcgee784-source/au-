@@ -1,0 +1,20 @@
+[project]
+name = "alpha-research-backend"
+version = "0.1.0"
+description = "FastAPI backend for the Alpha Research platform"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    # Starlette's TestClient suggests a separate httpx fork; the stable httpx
+    # release works and is what we pin.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
