@@ -127,15 +127,35 @@ export interface ScoringMethodology {
   bands: { min_score: number; label: string }[];
 }
 
+export interface CategoryScore {
+  key: string;
+  label: string;
+  weight: number;
+  /** Null when the category could not be rated for lack of data. */
+  points: number | null;
+  /** Sub-rating label -> rating (0-1) for the inputs that had data. */
+  inputs: Record<string, number>;
+  unrated_reason: string | null;
+}
+
 export interface StockScore {
   ticker: string;
   as_of: string;
   total_score: number;
   interpretation: string;
-  category_scores: Record<string, number>;
+  /** Fraction of the methodology's weight that was rated (1 = all categories). */
+  coverage: number;
+  categories: CategoryScore[];
   methodology_version: string;
   risk_class: string | null;
   notes: string | null;
+  calculated_at: string;
+}
+
+export interface MetricsSnapshot {
+  ticker: string;
+  as_of: string;
+  values: Record<string, number | null>;
 }
 
 export interface RankingEntry {
@@ -143,6 +163,7 @@ export interface RankingEntry {
   ticker: string;
   name: string;
   total_score: number;
+  coverage: number;
   interpretation: string;
   risk_class: string | null;
   as_of: string;

@@ -93,9 +93,19 @@ class RankingEntry(BaseModel):
     ticker: str
     name: str
     total_score: float
+    coverage: float
     interpretation: str
     risk_class: str | None
     as_of: date
+
+
+class CategoryScore(BaseModel):
+    key: str
+    label: str
+    weight: float
+    points: float | None  # None when the category could not be rated
+    inputs: dict[str, float]  # sub-rating label -> rating (0-1) for inputs that had data
+    unrated_reason: str | None
 
 
 class StockScoreOut(BaseModel):
@@ -103,7 +113,15 @@ class StockScoreOut(BaseModel):
     as_of: date
     total_score: float
     interpretation: str
-    category_scores: dict[str, float]
+    coverage: float
+    categories: list[CategoryScore]
     methodology_version: str
     risk_class: str | None
     notes: str | None
+    calculated_at: datetime
+
+
+class MetricsSnapshot(BaseModel):
+    ticker: str
+    as_of: date
+    values: dict[str, float | None]

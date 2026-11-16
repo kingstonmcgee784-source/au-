@@ -65,6 +65,37 @@ def total_score(ratings: Mapping[str, float]) -> tuple[float, dict[str, float]]:
     return round(sum(points.values()), 2), points
 
 
+def partial_score(
+    ratings: Mapping[str, float | None],
+) -> tuple[float, dict[str, float | None], float]:
+    """Score when some categories have no data.
+
+    Unrated categories (None) earn nothing and are excluded from the maximum,
+    so the total is the share of available points earned, scaled to 0-100.
+    Returns (total, points per category with None for unrated, coverage),
+    where coverage is the fraction of the methodology's weight that was rated.
+    """
+    unknown = set(ratings) - set(_WEIGHTS)
+    if unknown:
+        raise ValueError(f"unknown categories: {sorted(unknown)}")
+    points: dict[str, float | None] = {}
+    rated_weight = 0.0
+    earned = 0.0
+    for category in CATEGORIES:
+        rating = ratings.get(category.key)
+        if rating is None:
+            points[category.key] = None
+            continue
+        if not 0.0 <= rating <= 1.0:
+            raise ValueError(f"rating for {category.key!r} must be between 0 and 1, got {rating}")
+        points[category.key] = round(rating * category.weight, 2)
+        rated_weight += category.weight
+        earned += rating * category.weight
+    if rated_weight == 0:
+        raise ValueError("no categories could be rated")
+    return round(earned / rated_weight * 100, 1), points, round(rated_weight / 100, 2)
+
+
 def interpret(score: float) -> str:
     if not 0 <= score <= 100:
         raise ValueError("score must be between 0 and 100")

@@ -1,4 +1,4 @@
-"""Stored stock scores and the scoring methodology."""
+"""Stored stock scores, rankings and the scoring methodology."""
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -6,8 +6,14 @@ from sqlalchemy.orm import Session
 from app.analysis import scoring
 from app.models import Stock, StockScore
 from app.schemas.common import DataResponse, UnavailableReason, ok, unavailable
-from app.schemas.stocks import RankingEntry, ScoreCategory, ScoringMethodology, StockScoreOut
-from app.services.stocks import LOCAL_SOURCE, find_stock, no_stored_stock
+from app.schemas.stocks import (
+    CategoryScore,
+    RankingEntry,
+    ScoreCategory,
+    ScoringMethodology,
+    StockScoreOut,
+)
+from app.services.stocks import LOCAL_SOURCE, find_stock
 
 
 def methodology() -> ScoringMethodology:
@@ -17,6 +23,36 @@ def methodology() -> ScoringMethodology:
             ScoreCategory(key=c.key, label=c.label, weight=c.weight) for c in scoring.CATEGORIES
         ],
         bands=[{"min_score": minimum, "label": label} for minimum, label in scoring.BANDS],
+    )
+
+
+def score_out(ticker: str, row: StockScore) -> StockScoreOut:
+    details = row.details or {}
+    categories = []
+    for category in scoring.CATEGORIES:
+        detail = details.get(category.key)
+        detail = detail if isinstance(detail, dict) else {}
+        categories.append(
+            CategoryScore(
+                key=category.key,
+                label=category.label,
+                weight=category.weight,
+                points=row.category_scores.get(category.key),
+                inputs=detail.get("inputs") or {},
+                unrated_reason=detail.get("unrated_reason"),
+            )
+        )
+    return StockScoreOut(
+        ticker=ticker,
+        as_of=row.as_of,
+        total_score=row.total_score,
+        interpretation=scoring.interpret(row.total_score),
+        coverage=row.coverage,
+        categories=categories,
+        methodology_version=row.methodology_version,
+        risk_class=row.risk_class,
+        notes=row.notes,
+        calculated_at=row.calculated_at,
     )
 
 
@@ -44,8 +80,8 @@ def rankings(db: Session, limit: int) -> DataResponse[list[RankingEntry]]:
     if not rows:
         return unavailable(
             UnavailableReason.NO_STORED_DATA,
-            "No stocks have been scored yet. The scoring pipeline, which turns stored prices "
-            "and financial statements into 0-100 scores, is not built yet.",
+            "No stocks have been scored yet. Open a stock in Stock Analysis and use "
+            "Calculate score.",
         )
     entries = [
         RankingEntry(
@@ -53,6 +89,7 @@ def rankings(db: Session, limit: int) -> DataResponse[list[RankingEntry]]:
             ticker=stock.ticker,
             name=stock.name,
             total_score=score.total_score,
+            coverage=score.coverage,
             interpretation=scoring.interpret(score.total_score),
             risk_class=score.risk_class,
             as_of=score.as_of,
@@ -64,32 +101,19 @@ def rankings(db: Session, limit: int) -> DataResponse[list[RankingEntry]]:
 
 def get_latest_score(db: Session, ticker: str) -> DataResponse[StockScoreOut]:
     stock = find_stock(db, ticker)
-    if stock is None:
-        return unavailable(UnavailableReason.NO_STORED_DATA, no_stored_stock(ticker))
-
-    score = db.scalar(
-        select(StockScore)
-        .where(StockScore.stock_id == stock.id)
-        .order_by(StockScore.as_of.desc(), StockScore.id.desc())
-        .limit(1)
+    score = (
+        db.scalar(
+            select(StockScore)
+            .where(StockScore.stock_id == stock.id)
+            .order_by(StockScore.as_of.desc(), StockScore.id.desc())
+            .limit(1)
+        )
+        if stock
+        else None
     )
     if score is None:
         return unavailable(
             UnavailableReason.NO_STORED_DATA,
-            f"No score has been calculated for {ticker}. "
-            "The scoring pipeline is not built yet.",
+            f"{ticker} has not been scored yet. Use Calculate score to load its data and score it.",
         )
-    return ok(
-        StockScoreOut(
-            ticker=ticker,
-            as_of=score.as_of,
-            total_score=score.total_score,
-            interpretation=scoring.interpret(score.total_score),
-            category_scores=score.category_scores,
-            methodology_version=score.methodology_version,
-            risk_class=score.risk_class,
-            notes=score.notes,
-        ),
-        source=LOCAL_SOURCE,
-        as_of=score.calculated_at,
-    )
+    return ok(score_out(ticker, score), source=LOCAL_SOURCE, as_of=score.calculated_at)

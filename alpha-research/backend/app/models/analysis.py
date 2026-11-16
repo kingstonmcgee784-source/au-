@@ -31,8 +31,13 @@ class StockScore(Base):
     stock_id: Mapped[int] = mapped_column(ForeignKey("stocks.id", ondelete="CASCADE"), index=True)
     as_of: Mapped[date] = mapped_column(Date, index=True)
     total_score: Mapped[float] = mapped_column(Float)
-    # Category name -> points awarded (out of that category's weight).
-    category_scores: Mapped[dict[str, float]] = mapped_column(JSON)
+    # Category name -> points awarded (out of that category's weight), or None
+    # when the category could not be rated for lack of data.
+    category_scores: Mapped[dict[str, float | None]] = mapped_column(JSON)
+    # Fraction of the methodology's weight that was rated (1.0 = every category).
+    coverage: Mapped[float] = mapped_column(Float, default=1.0, server_default="1.0")
+    # Per category: the sub-ratings used, or why it was not rated.
+    details: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, server_default="{}")
     methodology_version: Mapped[str] = mapped_column(String(16))
     risk_class: Mapped[str | None] = mapped_column(String(16))
     notes: Mapped[str | None]

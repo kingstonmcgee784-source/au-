@@ -58,9 +58,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/rankings",
     label: "Stock Rankings",
     icon: Trophy,
-    stage: "planned",
-    description:
-      "Stocks ranked by the 0-100 composite score. The scoring pipeline that produces scores is not built yet.",
+    stage: "built",
+    requires: ["market_data", "fundamentals"],
+    description: "Stocks ranked by their latest 0-100 research score.",
   },
   {
     href: "/analysis",
@@ -68,7 +68,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: Search,
     stage: "built",
     requires: ["market_data"],
-    description: "Profile, quote and score for a single stock.",
+    description: "Profile, live quote, research score and key metrics for a single stock.",
   },
   {
     href: "/financials",

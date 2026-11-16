@@ -95,7 +95,15 @@ BALANCE_ITEMS: tuple[LineItem, ...] = (
     LineItem("total_assets", ("Assets",)),
     LineItem("current_liabilities", ("LiabilitiesCurrent",)),
     LineItem("total_liabilities", ("Liabilities",)),
-    LineItem("long_term_debt", ("LongTermDebtNoncurrent", "LongTermDebt")),
+    LineItem(
+        "long_term_debt",
+        (
+            "LongTermDebtNoncurrent",
+            "LongTermDebt",
+            "LongTermDebtAndCapitalLeaseObligations",
+            "LongTermNotesPayable",
+        ),
+    ),
     LineItem(
         "stockholders_equity",
         (

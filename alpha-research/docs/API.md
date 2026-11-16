@@ -87,6 +87,8 @@ class suffix (`MSFT`, `BRK.B`, `BF-B`).
 | `GET /stocks/{ticker}/financials?statement_type=&period_type=&limit=12` | `FinancialStatement[]` | From the database, newest period first, otherwise `no_stored_data` |
 | `GET /stocks/{ticker}/technicals` | `TechnicalSnapshot` | Calculated from stored daily prices; `insufficient_history` with fewer than 2 bars |
 | `GET /stocks/{ticker}/score` | `StockScore` | Latest stored score, otherwise `no_stored_data` |
+| `POST /stocks/{ticker}/score?refresh=true` | `StockScore` | Refreshes prices (and SPY) and SEC statements, calculates metrics, scores and stores. `insufficient_history` when a core category cannot be rated |
+| `GET /stocks/{ticker}/metrics` | `MetricsSnapshot` | The most recently calculated metrics, keyed by name |
 
 A `Quote` has `price`, `change`, `change_percent`, `previous_close`,
 `volume` and `timestamp`. It also has `feed`, which names the price feed.
@@ -112,6 +114,16 @@ In a `TechnicalSnapshot`, each indicator has `name`, `value` and
 `sma_100`, `sma_200`, `rsi_14`, `macd`, `macd_signal` and `macd_histogram`.
 
 ### Scoring
+
+A `StockScore` has the following fields:
+
+- `total_score`: 0–100, calculated over the categories that were rated.
+- `coverage`: the fraction of the methodology's weight that was rated.
+- `categories`: one entry per category, with `points` (`null` when unrated),
+  `inputs` (the sub-ratings used) and `unrated_reason`.
+- `risk_class`.
+- `notes`: lists the categories that were not scored and the methodology
+  limitations.
 
 | Method & path | Returns |
 |---|---|

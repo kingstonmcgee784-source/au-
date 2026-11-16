@@ -139,6 +139,42 @@ How the statements are built:
   this way, so those cells stay empty instead.
 - **Not built yet:** TTM statements.
 
+## Scoring
+
+On **Stock Analysis**, **Calculate score** refreshes the stock's prices and SEC
+statements, calculates its metrics, and scores it 0–100. Scored stocks then
+appear on **Stock Rankings**. From the command line:
+
+```bash
+cd alpha-research/backend && .venv/bin/python -m app.cli score PLTR LIVN MRCY
+```
+
+The pipeline runs in three layers:
+
+1. **Metrics** (`app/analysis/metrics.py`). Valuation (P/E, P/S, EV/EBITDA,
+   P/B, FCF yield), margins, ROE, growth, balance-sheet strength, dilution,
+   trend, momentum, relative strength vs SPY, and volatility. All come from
+   stored prices and the last four reported quarters (TTM).
+2. **Ratings** (`app/analysis/ratings.py`). Each metric maps to 0–1 through a
+   documented threshold table, and each category averages the inputs it has.
+3. **Score** (`app/analysis/scoring.py`). Categories are combined using the
+   weights 20/20/15/15/10/5/5/10.
+
+Rules that keep the score honest:
+
+- **Missing data is not zero.** A metric whose inputs are missing, or that is
+  not meaningful (for example P/E with negative earnings), is left empty.
+  Debt that a company does not report is not assumed to be zero.
+- **Unscored categories.** Catalysts, institutional/insider activity and
+  industry positioning have no data source yet, so they are not scored. The
+  total is the share of points earned in the categories that were rated,
+  shown with its **coverage** (normally 80%).
+- **Core categories are required.** A stock is not scored unless
+  fundamentals, valuation, technicals and growth can all be rated.
+  Otherwise the app says what data is missing.
+- **Known limitation:** thresholds are absolute, not sector-relative. A score
+  is a research aid, not a recommendation.
+
 ## Database
 
 SQLite at `backend/data/alpha_research.db` by default. Schema changes go
@@ -171,7 +207,7 @@ cd alpha-research/frontend && npm run lint && npm run build
 | Health check: API, database connection, schema revision, integration status | Working |
 | Watchlists: create, delete, add and remove tickers | Working, stored in SQLite |
 | Technical indicators (EMA 9/20/21, SMA 50/100/200, RSI 14, MACD) | Calculated from stored Tiingo prices |
-| Scoring methodology (weights, bands) and rankings from stored scores | Working; no scores are produced yet |
+| Metrics, 0–100 scores and rankings | Calculated from stored prices and SEC statements; 80% coverage until catalyst, ownership and industry data exist |
 | Stock search and profile | From Tiingo when configured, otherwise the local database |
 | Quotes, market overview (ETF proxies) | Live from Tiingo when configured |
 | Daily price history | Loaded from Tiingo into SQLite on request; incremental after the first load |

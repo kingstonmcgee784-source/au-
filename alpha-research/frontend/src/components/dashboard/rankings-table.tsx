@@ -35,6 +35,9 @@ export function RankingsPanel({ limit = 10, showLink = true }: { limit?: number;
                     <th className="px-4 py-2 font-medium">Ticker</th>
                     <th className="px-4 py-2 font-medium">Company</th>
                     <th className="px-4 py-2 text-right font-medium">Score</th>
+                    <th className="px-4 py-2 text-right font-medium" title="Share of the methodology that had data">
+                      Coverage
+                    </th>
                     <th className="px-4 py-2 font-medium">Risk</th>
                     <th className="px-4 py-2 font-medium">As of</th>
                   </tr>
@@ -54,6 +57,9 @@ export function RankingsPanel({ limit = 10, showLink = true }: { limit?: number;
                       <td className="max-w-48 truncate px-4 py-2 text-ink-muted">{entry.name}</td>
                       <td className="px-4 py-2 text-right font-mono" title={entry.interpretation}>
                         {formatNumber(entry.total_score, 0)}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono text-ink-faint">
+                        {Math.round(entry.coverage * 100)}%
                       </td>
                       <td className="px-4 py-2 text-ink-muted">{entry.risk_class ?? "—"}</td>
                       <td className="px-4 py-2 text-ink-faint">{formatDate(entry.as_of)}</td>

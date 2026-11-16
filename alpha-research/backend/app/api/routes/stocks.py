@@ -9,13 +9,14 @@ from app.schemas.common import DataResponse
 from app.schemas.stocks import (
     FinancialsSyncResult,
     FinancialStatementOut,
+    MetricsSnapshot,
     PriceSyncResult,
     Quote,
     StockScoreOut,
     StockSummary,
     TechnicalSnapshot,
 )
-from app.services import financials, ingestion, scores, stocks, technicals
+from app.services import financials, ingestion, scores, scoring_pipeline, stocks, technicals
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -77,3 +78,29 @@ def sync_financials(
 ) -> DataResponse[FinancialsSyncResult]:
     """Fetch reported financial statements from SEC EDGAR and store them."""
     return ingestion.sync_financials(db, source, ticker)
+
+
+@router.post("/{ticker}/score", response_model=DataResponse[StockScoreOut])
+def calculate_score(
+    db: DbSession,
+    market: MarketData,
+    source: Fundamentals,
+    settings: AppSettings,
+    ticker: TickerPath,
+    refresh: bool = True,
+) -> DataResponse[StockScoreOut]:
+    """Refresh the stock's data (unless refresh=false), calculate metrics and score it."""
+    return scoring_pipeline.score_stock(
+        db,
+        ticker,
+        market=market,
+        fundamentals=source,
+        refresh=refresh,
+        history_years=settings.price_history_years,
+    )
+
+
+@router.get("/{ticker}/metrics", response_model=DataResponse[MetricsSnapshot])
+def metrics(db: DbSession, ticker: TickerPath) -> DataResponse[MetricsSnapshot]:
+    """The most recently calculated metrics (valuation, margins, growth, price behaviour)."""
+    return scoring_pipeline.latest_metrics(db, ticker)

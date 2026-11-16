@@ -11,6 +11,7 @@ import type {
   FinancialStatement,
   FinancialsSyncResult,
   HealthResponse,
+  MetricsSnapshot,
   MarketOverview,
   PeriodType,
   PriceSyncResult,
@@ -120,6 +121,12 @@ export const api = {
     request<DataResponse<TechnicalSnapshot>>(`/stocks/${ticker(symbol)}/technicals`),
 
   score: (symbol: string) => request<DataResponse<StockScore>>(`/stocks/${ticker(symbol)}/score`),
+
+  calculateScore: (symbol: string) =>
+    request<DataResponse<StockScore>>(`/stocks/${ticker(symbol)}/score`, { method: "POST" }),
+
+  metrics: (symbol: string) =>
+    request<DataResponse<MetricsSnapshot>>(`/stocks/${ticker(symbol)}/metrics`),
 
   rankings: (limit = 10) => request<DataResponse<RankingEntry[]>>(`/rankings?limit=${limit}`),
 

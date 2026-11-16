@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Gauge, LineChart } from "lucide-react";
+import { Building2, LineChart } from "lucide-react";
 
 import { DataView, SourceNote } from "@/components/ui/data-view";
 import { EmptyState } from "@/components/ui/states";
@@ -9,13 +9,12 @@ import { api } from "@/lib/api/client";
 import {
   changeTone,
   formatCompact,
-  formatDate,
   formatNumber,
   formatPercent,
-  humanize,
 } from "@/lib/format";
 import { useApi } from "@/lib/hooks/use-api";
 
+import { CalculateScoreButton, MetricsPanel, ScorePanel } from "./score-panels";
 import { TickerForm, useTickerParam } from "./ticker-form";
 
 export function StockAnalysisView() {
@@ -25,14 +24,30 @@ export function StockAnalysisView() {
     <div className="space-y-4">
       <TickerForm key={ticker ?? ""} current={ticker} />
       {ticker ? (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <ProfilePanel ticker={ticker} />
-          <QuotePanel ticker={ticker} />
-          <ScorePanel ticker={ticker} />
-        </div>
+        <TickerResearch key={`research-${ticker}`} ticker={ticker} />
       ) : (
         <EmptyState title="Choose a stock">Enter a ticker above to load its research data.</EmptyState>
       )}
+    </div>
+  );
+}
+
+function TickerResearch({ ticker }: { ticker: string }) {
+  const score = useApi(`score-${ticker}`, () => api.score(ticker));
+  const metrics = useApi(`metrics-${ticker}`, () => api.metrics(ticker));
+  const reloadAll = () => {
+    score.reload();
+    metrics.reload();
+  };
+  return (
+    <div className="space-y-4">
+      <CalculateScoreButton ticker={ticker} onScored={reloadAll} />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ProfilePanel ticker={ticker} />
+        <QuotePanel ticker={ticker} />
+        <ScorePanel state={score.state} onRetry={score.reload} />
+      </div>
+      <MetricsPanel state={metrics.state} onRetry={metrics.reload} />
     </div>
   );
 }
@@ -84,37 +99,6 @@ function QuotePanel({ ticker }: { ticker: string }) {
               {formatCompact(quote.volume)}
             </p>
             <p className="mt-1 text-[11px] text-ink-faint">Feed: {quote.feed}</p>
-            <SourceNote source={response.source} asOf={response.as_of} />
-          </>
-        )}
-      </DataView>
-    </Panel>
-  );
-}
-
-function ScorePanel({ ticker }: { ticker: string }) {
-  const { state, reload } = useApi(`score-${ticker}`, () => api.score(ticker));
-  return (
-    <Panel title="Research score" icon={Gauge}>
-      <DataView state={state} onRetry={reload}>
-        {(score, response) => (
-          <>
-            <p className="font-mono text-2xl text-ink">
-              {formatNumber(score.total_score, 0)}
-              <span className="text-sm text-ink-faint"> / 100</span>
-            </p>
-            <p className="text-sm text-ink-muted">{score.interpretation}</p>
-            <dl className="mt-3 space-y-1 text-xs">
-              {Object.entries(score.category_scores).map(([key, points]) => (
-                <div key={key} className="flex justify-between">
-                  <dt className="text-ink-muted">{humanize(key)}</dt>
-                  <dd className="font-mono text-ink">{formatNumber(points, 1)}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-2 text-xs text-ink-faint">
-              Scored {formatDate(score.as_of)} · methodology v{score.methodology_version}
-            </p>
             <SourceNote source={response.source} asOf={response.as_of} />
           </>
         )}
