@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type { NavItem } from "@/lib/navigation";
 
-import { StageBadge } from "./badge";
+import { FeatureBadge } from "./feature-badge";
 
 export function PageHeader({ item, actions }: { item: NavItem; actions?: ReactNode }) {
   const Icon = item.icon;
@@ -12,7 +12,7 @@ export function PageHeader({ item, actions }: { item: NavItem; actions?: ReactNo
         <div className="flex items-center gap-3">
           <Icon className="size-5 text-accent" aria-hidden />
           <h1 className="text-xl font-semibold tracking-tight text-ink">{item.label}</h1>
-          <StageBadge stage={item.stage} />
+          <FeatureBadge href={item.href} />
         </div>
         <p className="text-sm text-ink-muted">{item.description}</p>
       </div>

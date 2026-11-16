@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { FeatureStage } from "@/lib/navigation";
+import type { FeatureStatus } from "@/lib/navigation";
 
 type Tone = "neutral" | "accent" | "positive" | "negative" | "info" | "warning";
 
@@ -23,18 +23,27 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: R
   );
 }
 
-const STAGE_LABEL: Record<FeatureStage, string> = {
+export const STATUS_LABEL: Record<FeatureStatus, string> = {
   live: "Live",
-  partial: "Needs data",
-  planned: "Planned",
+  setup: "Needs setup",
+  planned: "Not built yet",
+  unknown: "Checking",
 };
 
-const STAGE_TONE: Record<FeatureStage, Tone> = {
+export const STATUS_DESCRIPTION: Record<FeatureStatus, string> = {
+  live: "Works with the data sources that are connected",
+  setup: "Needs a data source to be configured in backend/.env",
+  planned: "Not built yet",
+  unknown: "Checking the backend",
+};
+
+const STATUS_TONE: Record<FeatureStatus, Tone> = {
   live: "positive",
-  partial: "info",
+  setup: "info",
   planned: "warning",
+  unknown: "neutral",
 };
 
-export function StageBadge({ stage }: { stage: FeatureStage }) {
-  return <Badge tone={STAGE_TONE[stage]}>{STAGE_LABEL[stage]}</Badge>;
+export function StatusBadge({ status }: { status: FeatureStatus }) {
+  return <Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>;
 }

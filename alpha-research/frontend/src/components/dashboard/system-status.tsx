@@ -6,9 +6,8 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { ErrorState, LoadingState } from "@/components/ui/states";
-import { api } from "@/lib/api/client";
+import { useHealth } from "@/components/layout/health-context";
 import type { IntegrationState } from "@/lib/api/types";
-import { useApi } from "@/lib/hooks/use-api";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -29,7 +28,7 @@ function IntegrationBadge({ state }: { state: IntegrationState }) {
 
 /** Live status from GET /health: API, database schema and integrations. */
 export function SystemStatusPanel() {
-  const { state, reload } = useApi("health-panel", api.health);
+  const { state, reload } = useHealth();
 
   return (
     <Panel title="System status" icon={Server}>

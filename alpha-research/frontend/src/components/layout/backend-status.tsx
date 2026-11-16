@@ -1,20 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
-
-import { api } from "@/lib/api/client";
-import { useApi } from "@/lib/hooks/use-api";
-
-const POLL_MS = 30_000;
+import { useHealth } from "./health-context";
 
 /** Small indicator showing whether the frontend can reach the backend. */
 export function BackendStatus() {
-  const { state, reload } = useApi("health", api.health);
-
-  useEffect(() => {
-    const id = window.setInterval(reload, POLL_MS);
-    return () => window.clearInterval(id);
-  }, [reload]);
+  const { state } = useHealth();
 
   let dot = "bg-ink-faint";
   let label = "Checking API";

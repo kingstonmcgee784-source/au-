@@ -4,19 +4,19 @@ import { Activity, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { NAV_ITEMS, type FeatureStage } from "@/lib/navigation";
+import { STATUS_DESCRIPTION, STATUS_LABEL } from "@/components/ui/badge";
+import { featureStatus, type FeatureStatus, NAV_ITEMS } from "@/lib/navigation";
 
-const STAGE_DOT: Record<FeatureStage, string> = {
+import { useHealth } from "./health-context";
+
+const STATUS_DOT: Record<FeatureStatus, string> = {
   live: "bg-positive",
-  partial: "bg-info",
+  setup: "bg-info",
   planned: "bg-warning",
+  unknown: "bg-ink-faint",
 };
 
-const STAGE_TITLE: Record<FeatureStage, string> = {
-  live: "Live",
-  partial: "Built, needs data integrations",
-  planned: "Planned, not built yet",
-};
+const LEGEND: FeatureStatus[] = ["live", "setup", "planned"];
 
 interface SidebarProps {
   open: boolean;
@@ -25,6 +25,8 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { state } = useHealth();
+  const health = state.kind === "success" ? state.data : null;
 
   return (
     <>
@@ -61,7 +63,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         <nav className="flex-1 overflow-y-auto px-2 py-3">
           <ul className="space-y-0.5">
-            {NAV_ITEMS.map(({ href, label, icon: Icon, stage }) => {
+            {NAV_ITEMS.map((item) => {
+              const { href, label, icon: Icon } = item;
+              const status = featureStatus(item, health);
               const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
               return (
                 <li key={href}>
@@ -81,8 +85,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                     />
                     <span className="flex-1 truncate">{label}</span>
                     <span
-                      className={`size-1.5 rounded-full ${STAGE_DOT[stage]}`}
-                      title={STAGE_TITLE[stage]}
+                      className={`size-1.5 rounded-full ${STATUS_DOT[status]}`}
+                      title={`${STATUS_LABEL[status]}: ${STATUS_DESCRIPTION[status]}`}
                     />
                   </Link>
                 </li>
@@ -92,10 +96,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         <div className="space-y-1.5 border-t border-line px-4 py-3 text-[11px] text-ink-faint">
-          {(Object.keys(STAGE_DOT) as FeatureStage[]).map((stage) => (
-            <div key={stage} className="flex items-center gap-2">
-              <span className={`size-1.5 rounded-full ${STAGE_DOT[stage]}`} />
-              {STAGE_TITLE[stage]}
+          {LEGEND.map((status) => (
+            <div key={status} className="flex items-center gap-2">
+              <span className={`size-1.5 rounded-full ${STATUS_DOT[status]}`} />
+              {STATUS_LABEL[status]}
             </div>
           ))}
         </div>

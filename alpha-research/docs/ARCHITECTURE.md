@@ -66,9 +66,11 @@ Browser ──► Next.js /api/backend/* ──rewrite──► FastAPI /api/v1/
 - **One loading and error pattern.** `useApi` drives every request, and
   `DataView` renders the loading, error, unavailable and success states the
   same way everywhere.
-- **Feature stages are explicit.** `lib/navigation.ts` marks each section as
-  `live`, `partial` (built, needs data) or `planned`. The sidebar and page
-  headers show this, and planned pages use `FeatureStatus` to say what is
-  missing and what it depends on.
+- **Feature status is live, not hard-coded.** `lib/navigation.ts` marks each
+  section as `built` or `planned` and lists the integrations it `requires`.
+  The sidebar and page headers compare those integrations with `/health` and
+  show **Live**, **Needs setup** (an integration is not configured) or **Not
+  built yet**. Planned pages use `FeatureStatus` to say what is missing and
+  what it depends on.
 - **URL holds the ticker** (`?ticker=`), so analysis pages can be linked and
   bookmarked.

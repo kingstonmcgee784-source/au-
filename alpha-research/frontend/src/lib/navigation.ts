@@ -14,20 +14,27 @@ import {
   Trophy,
 } from "lucide-react";
 
+import type { HealthResponse } from "@/lib/api/types";
+
+/** A backend integration a page needs before it can show data. */
+export type Integration = keyof HealthResponse["integrations"];
+
 /**
- * How far along a section is. Shown in the sidebar so nobody mistakes an
- * unfinished page for a working feature.
- *  - live:    works end to end with the data the platform has.
- *  - partial: the page and API exist, but need data integrations to show data.
- *  - planned: page structure only; the feature is not built yet.
+ * Whether a section is built at all. A built section is "live" only once the
+ * integrations it `requires` are configured; that is checked at runtime
+ * against the backend's health endpoint (see `featureStatus`).
  */
-export type FeatureStage = "live" | "partial" | "planned";
+export type FeatureStage = "built" | "planned";
+
+/** What the badges show. */
+export type FeatureStatus = "live" | "setup" | "planned" | "unknown";
 
 export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
   stage: FeatureStage;
+  requires?: readonly Integration[];
   description: string;
 }
 
@@ -36,7 +43,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/",
     label: "Overview",
     icon: LayoutDashboard,
-    stage: "partial",
+    stage: "built",
+    requires: ["market_data"],
     description: "Market overview, rankings, watchlist and recent research at a glance.",
   },
   {
@@ -50,28 +58,32 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/rankings",
     label: "Stock Rankings",
     icon: Trophy,
-    stage: "partial",
-    description: "Stocks ranked by the 0-100 composite score.",
+    stage: "planned",
+    description:
+      "Stocks ranked by the 0-100 composite score. The scoring pipeline that produces scores is not built yet.",
   },
   {
     href: "/analysis",
     label: "Stock Analysis",
     icon: Search,
-    stage: "partial",
+    stage: "built",
+    requires: ["market_data"],
     description: "Profile, quote and score for a single stock.",
   },
   {
     href: "/financials",
     label: "Financials",
     icon: FileSpreadsheet,
-    stage: "partial",
+    stage: "built",
+    requires: ["fundamentals"],
     description: "Income statement, balance sheet and cash flow history from SEC filings.",
   },
   {
     href: "/technical",
     label: "Technical Analysis",
     icon: CandlestickChart,
-    stage: "partial",
+    stage: "built",
+    requires: ["market_data"],
     description: "Load daily prices, then calculate moving averages, RSI and MACD from them.",
   },
   {
@@ -85,14 +97,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/watchlist",
     label: "Watchlist",
     icon: Star,
-    stage: "live",
+    stage: "built",
     description: "Create watchlists and track tickers.",
   },
   {
     href: "/ai-research",
     label: "AI Research",
     icon: Bot,
-    stage: "partial",
+    stage: "built",
+    requires: ["ai_research"],
     description: "AI-written research reports built from platform data.",
   },
   {
@@ -113,7 +126,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/settings",
     label: "Settings",
     icon: Settings,
-    stage: "partial",
+    stage: "built",
     description: "System status and integration configuration.",
   },
 ];
@@ -129,4 +142,14 @@ export function navItem(href: string): NavItem {
   const item = NAV_ITEMS.find((candidate) => candidate.href === href);
   if (!item) throw new Error(`No navigation item for ${href}`);
   return item;
+}
+
+/** Live status of a section given the backend's health (null while unknown). */
+export function featureStatus(item: NavItem, health: HealthResponse | null): FeatureStatus {
+  if (item.stage === "planned") return "planned";
+  if (!item.requires?.length) return "live";
+  if (!health) return "unknown";
+  return item.requires.every((name) => health.integrations[name] === "configured")
+    ? "live"
+    : "setup";
 }
