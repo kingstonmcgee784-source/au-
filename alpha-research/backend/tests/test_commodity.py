@@ -85,3 +85,5 @@ def test_falling_oil_lowers_valuation_and_growth(db: Session) -> None:
     assert cat(falling, "fundamentals")["points"] == cat(steady, "fundamentals")["points"]
     assert "Oil adjustment" in falling["notes"]
     assert "Oil adjustment" not in steady["notes"]
+    # Steady oil is still reported, so the check is visible.
+    assert "not adjusted for oil" in cat(steady, "valuation")["summary"]

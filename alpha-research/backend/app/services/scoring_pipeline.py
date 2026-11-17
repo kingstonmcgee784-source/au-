@@ -160,7 +160,10 @@ def score_stock(
             " judge the size of a contract or the outcome of earnings."
         )
     if oil_note:
-        notes += f" Oil adjustment: {oil_note}" if adjustments else f" {oil_note}"
+        lowered = any(m < 1.0 for m in adjustments.values())
+        notes += (
+            f" Oil adjustment (valuation and growth): {oil_note}" if lowered else f" {oil_note}"
+        )
     if warnings:
         notes += " " + " ".join(warnings)
 
@@ -289,11 +292,12 @@ def _oil_adjustment(
     gap = commodity.oil_gap(closes)
     metrics["oil_vs_quarter_avg"] = gap
     if gap is None:
-        return {}, (
-            "Oil prices (USO) are not loaded yet, so no oil adjustment was applied; "
-            "calculate the score again once they load."
+        return {key: 1.0 for key in commodity.ADJUSTED}, (
+            "Oil check: oil prices (USO) are not loaded yet, so this rating is not adjusted "
+            "for oil. Calculate the score again once they load (Tiingo allows 50 requests "
+            "an hour)."
         )
     multiplier = commodity.factor(gap)
-    if multiplier >= 1.0:
-        return {}, None
+    # Always returned for oil companies, so the explanation says what was
+    # checked even when nothing changed (a multiplier of 1).
     return {key: multiplier for key in commodity.ADJUSTED}, commodity.note(gap, multiplier)

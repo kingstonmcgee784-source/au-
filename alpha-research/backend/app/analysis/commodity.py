@@ -38,6 +38,13 @@ def factor(gap: float | None) -> float:
 
 
 def note(gap: float, multiplier: float) -> str:
+    if multiplier >= 1.0:
+        side = "above" if gap >= 0 else "below"
+        return (
+            f"Oil check: oil (USO) is {abs(gap) * 100:.1f}% {side} its average over the last "
+            f"quarter. Only a drop of more than {abs(THRESHOLD) * 100:.0f}% counts, so this "
+            "rating is not adjusted for oil."
+        )
     return (
         f"Lowered by {(1 - multiplier) * 100:.0f}% because oil (USO) is {abs(gap) * 100:.1f}% "
         "below its average over the last quarter. The company's reported results come from "
