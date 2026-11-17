@@ -7,6 +7,9 @@
  */
 
 import type {
+  PriceUpdateResult,
+  TrackedCall,
+  TrackRecord,
   CatalystFeed,
   EventsSyncResult,
   DataResponse,
@@ -147,6 +150,19 @@ export const api = {
 
   catalysts: (symbol: string) =>
     request<DataResponse<CatalystFeed>>(`/stocks/${ticker(symbol)}/catalysts`),
+
+  trackRecord: () => request<TrackRecord>("/recommendations"),
+
+  trackCall: (symbol: string, thesis?: string) =>
+    request<DataResponse<TrackedCall>>("/recommendations", {
+      method: "POST",
+      body: JSON.stringify({ ticker: symbol, thesis: thesis || null }),
+    }),
+
+  deleteCall: (id: number) => request<void>(`/recommendations/${id}`, { method: "DELETE" }),
+
+  updateTrackedPrices: () =>
+    request<DataResponse<PriceUpdateResult>>("/recommendations/update-prices", { method: "POST" }),
 
   rankings: (limit = 10) => request<DataResponse<RankingEntry[]>>(`/rankings?limit=${limit}`),
 

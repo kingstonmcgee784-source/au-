@@ -16,7 +16,7 @@ import {
 import { useApi } from "@/lib/hooks/use-api";
 
 import { InsiderPanel } from "./insider-panel";
-import { CalculateScoreButton, MetricsPanel, ScorePanel } from "./score-panels";
+import { CalculateScoreButton, MetricsPanel, ScorePanel, TrackCallButton } from "./score-panels";
 import { TickerForm, useTickerParam } from "./ticker-form";
 
 export function StockAnalysisView() {
@@ -47,6 +47,7 @@ function TickerResearch({ ticker }: { ticker: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-4">
         <CalculateScoreButton ticker={ticker} onScored={reloadAll} />
+        <TrackCallButton ticker={ticker} onTracked={() => undefined} />
         <Link
           href={`/news?ticker=${ticker}`}
           className="inline-flex h-9 items-center rounded-md px-3 text-sm text-ink-muted hover:text-accent"

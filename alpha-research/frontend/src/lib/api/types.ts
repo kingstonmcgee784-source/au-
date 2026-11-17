@@ -271,3 +271,31 @@ export interface CatalystFeed {
   days_to_next_earnings: number | null;
   events: CatalystEvent[];
 }
+
+export interface TrackedCall {
+  id: number;
+  ticker: string;
+  name: string;
+  recommended_on: string;
+  reference_price: number;
+  reference_price_source: string;
+  score: number | null;
+  risk_class: string | null;
+  thesis: string | null;
+  horizon_days: number;
+  created_at: string;
+  /** True only on the day the call was recorded. */
+  deletable: boolean;
+  /** Returns as fractions; null means pending or not available. */
+  performance: Record<string, number | null>;
+}
+
+export interface TrackRecord {
+  calls: TrackedCall[];
+  summary: Record<string, Record<string, number | null>>;
+  benchmarks_missing: string[];
+}
+
+export interface PriceUpdateResult {
+  results: { ticker: string; ok: boolean; message: string }[];
+}

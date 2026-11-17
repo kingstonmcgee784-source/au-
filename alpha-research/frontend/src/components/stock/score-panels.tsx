@@ -228,3 +228,20 @@ export function MetricsPanel({
     </Panel>
   );
 }
+
+/** Record the stock's current score and latest price as a tracked call. */
+export function TrackCallButton({ ticker, onTracked }: { ticker: string; onTracked: () => void }) {
+  return (
+    <SyncButton
+      label="Track this call"
+      busyLabel="Recording…"
+      run={() => api.trackCall(ticker)}
+      describe={(call) =>
+        `Tracking ${call.ticker} from ${formatNumber(call.reference_price)} on ` +
+        `${formatDate(call.recommended_on)} (score ${formatNumber(call.score, 0)}). ` +
+        "See Performance Tracking."
+      }
+      onSynced={onTracked}
+    />
+  );
+}

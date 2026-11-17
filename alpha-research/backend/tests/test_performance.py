@@ -1,0 +1,139 @@
+"""Performance math and the track-record API, with stored test prices."""
+
+from collections.abc import Iterator
+from datetime import UTC, date, datetime, timedelta
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import update
+from sqlalchemy.orm import Session
+
+from app.analysis.performance import Bar, call_performance, summary
+from app.api.deps import market_data_provider
+from app.main import app
+from app.models import HistoricalPrice, Recommendation, Stock, StockScore
+from tests.fakes import FakeProvider, bars
+
+START = date(2026, 1, 1)
+
+
+def series(closes: list[float], start: date = START) -> list[Bar]:
+    return [Bar(start + timedelta(days=i), c) for i, c in enumerate(closes)]
+
+
+def test_call_performance_horizons_and_excursions() -> None:
+    stock = series([100, 95, 110] + [120] * 40)  # dips, then rises
+    bench = series([50] * 3 + [55] * 40)
+    p = call_performance(START, 100.0, stock, {"SPY": bench})
+    assert p["return_now"] == pytest.approx(0.20)
+    assert p["max_drawdown"] == pytest.approx(-0.05)
+    assert p["max_gain"] == pytest.approx(0.20)
+    assert p["return_1w"] == pytest.approx(0.20)
+    assert p["return_1m"] == pytest.approx(0.20)
+    assert p["return_3m"] is None  # 91 days have not passed in the data: pending
+    assert p["spy_return_1w"] == pytest.approx(0.10)
+    assert p["excess_vs_spy_1w"] == pytest.approx(0.10)
+    assert p["excess_vs_spy_3m"] is None
+
+
+def test_call_performance_without_later_prices() -> None:
+    p = call_performance(START, 100.0, series([100]), {})
+    assert p["return_now"] is None and p["days_tracked"] == 0.0
+
+
+def test_summary_statistics() -> None:
+    s = summary([0.10, -0.05, 0.20, 0.0], [0.05, -0.10, 0.08, -0.01])
+    assert s["count"] == 4
+    assert s["average"] == pytest.approx(0.0625)
+    assert s["median"] == pytest.approx(0.05)
+    assert s["win_rate"] == pytest.approx(0.5)
+    assert s["average_gain"] == pytest.approx(0.15)
+    assert s["average_loss"] == pytest.approx(-0.025)
+    assert s["beat_spy_rate"] == pytest.approx(0.5)
+    assert summary([], [])["average"] is None
+
+
+# -- API ------------------------------------------------------------------------
+
+
+@pytest.fixture
+def market() -> Iterator[FakeProvider]:
+    fake = FakeProvider({symbol: bars(START, 120, 100.0) for symbol in ("SPY", "QQQ", "IWM")})
+    app.dependency_overrides[market_data_provider] = lambda: fake
+    yield fake
+    app.dependency_overrides.clear()
+
+
+def scored_stock(db: Session, ticker: str = "TEST", days: int = 100) -> Stock:
+    stock = Stock(ticker=ticker, name="Test Holdings Inc", exchange="NASDAQ")
+    db.add(stock)
+    db.flush()
+    for i in range(days):
+        close = 50.0 + i
+        db.add(HistoricalPrice(stock_id=stock.id, date=START + timedelta(days=i), open=close,
+                               high=close, low=close, close=close, volume=1, source="test"))
+    db.add(StockScore(stock_id=stock.id, as_of=START + timedelta(days=days - 1), total_score=72.0,
+                      category_scores={}, methodology_version="1.0", risk_class="Moderate"))
+    db.commit()
+    return stock
+
+
+def test_track_requires_a_score(client: TestClient, market: FakeProvider) -> None:
+    body = client.post("/api/v1/recommendations", json={"ticker": "TEST"}).json()
+    assert body["status"] == "unavailable"
+    assert "Calculate a score" in body["message"]
+
+
+def test_track_and_measure(client: TestClient, market: FakeProvider, db: Session) -> None:
+    stock = scored_stock(db, days=60)
+    created = client.post("/api/v1/recommendations", json={"ticker": "test", "thesis": "Cheap"})
+    assert created.status_code == 201
+    call = created.json()["data"]
+    assert call["reference_price"] == 109.0  # last stored close
+    assert call["score"] == 72.0 and call["risk_class"] == "Moderate"
+    assert call["performance"]["return_now"] is None  # no prices after the call yet
+
+    # The same stock cannot be tracked twice from the same price date.
+    assert client.post("/api/v1/recommendations", json={"ticker": "TEST"}).status_code == 409
+
+    # Prices arrive later: +10% after a week.
+    for i in range(60, 75):
+        db.add(HistoricalPrice(stock_id=stock.id, date=START + timedelta(days=i), open=1, high=1,
+                               low=1, close=119.9, volume=1, source="test"))
+    db.commit()
+    record = client.get("/api/v1/recommendations").json()
+    perf = record["calls"][0]["performance"]
+    assert perf["return_1w"] == pytest.approx(119.9 / 109 - 1)
+    assert perf["return_1m"] is None
+    assert perf["spy_return_1w"] is not None
+    assert record["summary"]["1w"]["count"] == 1
+    assert record["summary"]["1m"]["count"] == 0
+    assert record["benchmarks_missing"] == []
+
+
+def test_delete_only_on_the_same_day(client: TestClient, market: FakeProvider, db: Session) -> None:
+    scored_stock(db)
+    call_id = client.post("/api/v1/recommendations", json={"ticker": "TEST"}).json()["data"]["id"]
+
+    db.execute(
+        update(Recommendation)
+        .where(Recommendation.id == call_id)
+        .values(created_at=datetime.now(UTC) - timedelta(days=2))
+    )
+    db.commit()
+    refused = client.delete(f"/api/v1/recommendations/{call_id}")
+    assert refused.status_code == 409
+    assert "cannot be edited" in refused.json()["detail"]
+
+    db.execute(update(Recommendation).values(created_at=datetime.now(UTC)))
+    db.commit()
+    assert client.delete(f"/api/v1/recommendations/{call_id}").status_code == 204
+
+
+def test_update_prices(client: TestClient, market: FakeProvider, db: Session) -> None:
+    scored_stock(db)
+    market.known["TEST"] = bars(START, 120, 50.0)
+    client.post("/api/v1/recommendations", json={"ticker": "TEST"})
+    body = client.post("/api/v1/recommendations/update-prices").json()
+    assert body["status"] == "ok"
+    assert [r["ticker"] for r in body["data"]["results"]] == ["TEST", "SPY", "QQQ", "IWM"]

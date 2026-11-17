@@ -231,6 +231,28 @@ Rules that keep the score honest:
 - **Known limitation:** thresholds are absolute, not sector-relative. A score
   is a research aid, not a recommendation.
 
+## Performance tracking
+
+On **Stock Analysis**, after **Calculate score**, use **Track this call**. It
+records the stock's current score, risk class and its latest stored adjusted
+closing price, with the date. **Performance Tracking** then measures each
+call:
+
+- **Measures per call:** the return now and after 1 week, 1 month and 3
+  months, plus the best and worst point since the call. Each is compared with
+  SPY (S&P 500), QQQ (Nasdaq 100) and IWM (Russell 2000) over the same
+  window.
+- **Summary per horizon:** average and median return, win rate, average gain
+  and loss, best and worst, average excess return over the S&P 500, and how
+  often the call beat it.
+- **Pending periods:** a period that has not ended in the stored prices shows
+  as "pending". Adjusted prices are used, so dividends are included.
+- **Update prices:** refreshes the tracked stocks and the benchmarks, at most
+  every 6 hours each.
+- **No rewriting history:** calls cannot be edited, and can be removed only
+  on the day they were recorded. The same stock cannot be tracked twice from
+  the same price date.
+
 ## Database
 
 SQLite at `backend/data/alpha_research.db` by default. Schema changes go
@@ -271,7 +293,8 @@ cd alpha-research/frontend && npm run lint && npm run build
 | Financial statements (income, balance sheet, cash flow; quarterly and annual) | Loaded from SEC EDGAR into SQLite on request |
 | AI report generation | Reports `ai_not_configured` |
 | News & Catalysts (8-K events, estimated earnings date) | Loaded from the SEC filing index on request |
-| Screener, Backtesting, Performance Tracking | Pages describe the planned feature; not built |
+| Performance tracking (tracked calls vs S&P 500, Nasdaq 100, Russell 2000) | Working, from stored prices |
+| Screener, Backtesting | Pages describe the planned feature; not built |
 
 See [docs/API.md](docs/API.md) for every endpoint and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design decisions.

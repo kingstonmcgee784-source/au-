@@ -161,6 +161,24 @@ Their names say "ETF" so they are not mistaken for the indexes.
 | `GET /reports/{id}` | `ResearchReport` with `body_markdown`, or 404 |
 | `POST /reports/generate` with body `{"ticker": "MSFT"}` | Envelope of `ResearchReport`; currently `ai_not_configured` |
 
+### Performance tracking
+
+| Method & path | Body | Returns |
+|---|---|---|
+| `GET /recommendations` | | `TrackRecord`: every call with its `performance`, plus `summary` statistics for horizons `1w`, `1m`, `3m` and `now`, and `benchmarks_missing` |
+| `POST /recommendations` | `{"ticker": "PLTR", "thesis": "...", "horizon_days": 90}` | 201, envelope of `TrackedCall`. Needs a stored score and price (`no_stored_data` otherwise). 409 if the stock is already tracked from that price date |
+| `DELETE /recommendations/{id}` | | 204 on the day the call was recorded, otherwise 409 |
+| `POST /recommendations/update-prices` | | Refreshes prices for tracked stocks and SPY, QQQ, IWM |
+
+In `performance`, returns are fractions:
+
+- `return_now`, `return_1w`, `return_1m`, `return_3m`, `max_gain`,
+  `max_drawdown`.
+- For each benchmark, `{spy|qqq|iwm}_return_{horizon}` and
+  `excess_vs_{spy|qqq|iwm}_{horizon}`.
+
+A value is `null` while that period is pending.
+
 ### Watchlists
 
 | Method & path | Body | Returns |

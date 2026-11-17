@@ -120,8 +120,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/performance",
     label: "Performance Tracking",
     icon: BarChart3,
-    stage: "planned",
-    description: "Track every recommendation against the S&P 500, Nasdaq 100 and Russell 2000.",
+    stage: "built",
+    requires: ["market_data"],
+    description:
+      "How tracked calls performed against the S&P 500, Nasdaq 100 and Russell 2000.",
   },
   {
     href: "/settings",
