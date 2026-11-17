@@ -54,6 +54,7 @@ def score_stock(
     history_years: int,
 ) -> DataResponse[StockScoreOut]:
     warnings: list[str] = []
+    sec_unknown = False
     if refresh:
         for label, result in (
             ("prices", ingestion.sync_prices(db, market, ticker, history_years=history_years)),
@@ -66,12 +67,23 @@ def score_stock(
             ("SEC 8-K events", catalysts.sync_events(db, fundamentals, ticker)),
         ):
             if result.status != DataStatus.OK:
+                if result.reason == UnavailableReason.UNKNOWN_TICKER and label != "prices":
+                    sec_unknown = True
                 warnings.append(f"Could not refresh {label}: {result.message}")
 
     stock = find_stock(db, ticker)
     if stock is None:
         detail = " ".join(warnings) or f"{ticker} has no stored data."
         return unavailable(UnavailableReason.NO_STORED_DATA, f"Cannot score {ticker}. {detail}")
+
+    if sec_unknown and not _statements(db, stock.id, "income"):
+        return unavailable(
+            UnavailableReason.UNKNOWN_TICKER,
+            f"The SEC has no company with the ticker {ticker}, so it cannot be scored. Check "
+            "the spelling, or type the company's name in the search box at the top to find "
+            "its ticker. Only US-listed companies that file reports with the SEC can be "
+            "scored; ETFs, funds and most foreign companies cannot.",
+        )
 
     prices = _prices(db, stock.id)
     benchmark = find_stock(db, BENCHMARK)

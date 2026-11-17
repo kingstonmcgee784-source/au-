@@ -187,3 +187,19 @@ def test_old_scores_get_values_and_reasoning(
     assert "60.0×" in pe["explanation"] or "10.0×" in pe["explanation"]  # cites the scale
     assert "earnings" in pe["meaning"]
     assert valuation["summary"].startswith(("Strongest", "All inputs"))
+
+
+def test_ticker_the_sec_does_not_know(db) -> None:  # type: ignore[no-untyped-def]
+    from app.providers.base import TickerNotFoundError
+    from app.services.scoring_pipeline import score_stock
+
+    class NoSec(FakeSec):
+        def lookup(self, ticker: str) -> tuple[int, str]:
+            raise TickerNotFoundError(ticker)
+
+    market = FakeProvider({"LAM": bars(date(2025, 1, 1), 300), "SPY": bars(date(2025, 1, 1), 300)})
+    result = score_stock(
+        db, "LAM", market=market, fundamentals=NoSec(), refresh=True, history_years=2
+    )
+    assert result.status == "unavailable"
+    assert result.message.startswith("The SEC has no company with the ticker LAM")
