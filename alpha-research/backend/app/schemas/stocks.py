@@ -187,3 +187,22 @@ class CatalystFeed(BaseModel):
     next_earnings_estimate: date | None
     days_to_next_earnings: int | None
     events: list[CatalystEvent]
+
+
+class PeerRow(BaseModel):
+    ticker: str
+    name: str
+    is_subject: bool
+    score: float | None
+    metrics: dict[str, float | None]
+
+
+class IndustryComparison(BaseModel):
+    ticker: str
+    industry: str | None
+    sic_code: str
+    peer_group: str  # e.g. "SIC 7372" or "SIC 73xx" when widened
+    # metric -> percentile among peers (1 = best), None when not comparable
+    positioning: dict[str, float | None]
+    valuation: dict[str, float | None]
+    rows: list[PeerRow]  # the stock first, then its peers

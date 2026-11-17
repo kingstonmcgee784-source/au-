@@ -26,6 +26,7 @@ class UnavailableReason(StrEnum):
     INSUFFICIENT_HISTORY = "insufficient_history"
     UNKNOWN_TICKER = "unknown_ticker"
     PROVIDER_ERROR = "provider_error"
+    RATE_LIMITED = "rate_limited"
 
 
 class DataResponse[T](BaseModel):

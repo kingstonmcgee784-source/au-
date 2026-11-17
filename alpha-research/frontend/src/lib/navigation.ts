@@ -51,8 +51,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/screener",
     label: "Stock Screener",
     icon: Filter,
-    stage: "planned",
-    description: "Filter the market by fundamentals, valuation, technicals and liquidity.",
+    stage: "built",
+    requires: ["market_data", "fundamentals"],
+    description: "Scan lists of stocks, then filter and sort them by score, valuation, growth and risk.",
   },
   {
     href: "/rankings",

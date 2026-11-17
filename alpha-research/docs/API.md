@@ -161,6 +161,32 @@ Their names say "ETF" so they are not mistaken for the indexes.
 | `GET /reports/{id}` | `ResearchReport` with `body_markdown`, or 404 |
 | `POST /reports/generate` with body `{"ticker": "MSFT"}` | Envelope of `ResearchReport`; currently `ai_not_configured` |
 
+### Screener
+
+| Method & path | Body | Returns |
+|---|---|---|
+| `GET /screener` | | `ScreenerRow[]`: every scored stock with its latest score, coverage, risk and metrics |
+| `GET /screener/scans?limit=10` | | `Scan[]`, newest first |
+| `POST /screener/scans` | `{"tickers": ["PLTR", "LIVN"], "watchlist_id": 1, "name": "..."}` | 201, `Scan`. Starts a background scan. 409 if a scan is already running |
+| `GET /screener/scans/{id}` | | `Scan` with per-ticker `status` (`pending`, `scored`, `not_scored` or `failed`) |
+| `POST /screener/scans/{id}/cancel` | | `Scan` |
+
+A scan's `status` is `queued`, `running`, `waiting`, `done` or `cancelled`.
+While it is `waiting` for a rate limit to reset, `resume_at` says when it
+continues.
+
+`GET /stocks/{ticker}/industry` returns an `IndustryComparison`:
+
+- `peer_group`, for example "SIC 7372", or "SIC 737x" when the group was
+  widened.
+- `positioning` and `valuation`: percentiles among peers, where 1 = best.
+- `rows`: the stock and its peers, with key metrics.
+
+It returns `insufficient_history` with fewer than 4 scored peers.
+
+A data endpoint may also answer `rate_limited` when a provider's request
+limit is reached.
+
 ### Performance tracking
 
 | Method & path | Body | Returns |

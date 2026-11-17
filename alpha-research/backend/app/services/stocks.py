@@ -6,7 +6,12 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Stock
-from app.providers.base import MarketDataProvider, ProviderError, TickerNotFoundError
+from app.providers.base import (
+    MarketDataProvider,
+    ProviderError,
+    ProviderRateLimitError,
+    TickerNotFoundError,
+)
 from app.schemas.common import DataResponse, UnavailableReason, ok, unavailable
 from app.schemas.stocks import Quote, StockSummary
 
@@ -30,6 +35,8 @@ def provider_failure[T](exc: ProviderError, ticker: str | None = None) -> DataRe
             UnavailableReason.UNKNOWN_TICKER,
             f"The data provider does not recognize {ticker}." if ticker else str(exc),
         )
+    if isinstance(exc, ProviderRateLimitError):
+        return unavailable(UnavailableReason.RATE_LIMITED, str(exc))
     logger.warning("Provider error: %s", exc)
     return unavailable(UnavailableReason.PROVIDER_ERROR, str(exc))
 

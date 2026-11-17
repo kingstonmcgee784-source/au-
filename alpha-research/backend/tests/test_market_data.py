@@ -47,7 +47,7 @@ def test_unknown_ticker_and_provider_errors(client: TestClient, provider: FakePr
     assert client.get("/api/v1/stocks/ZZZZ/quote").json()["reason"] == "unknown_ticker"
     provider.fail_with = ProviderRateLimitError("limit reached")
     body = client.get("/api/v1/stocks/LIVN/quote").json()
-    assert body["reason"] == "provider_error"
+    assert body["reason"] == "rate_limited"
     assert body["message"] == "limit reached"
 
 

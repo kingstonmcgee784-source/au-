@@ -125,14 +125,27 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
             ),
         ),
     ),
-    # No data source yet: always unrated.
-    "industry": (1, ()),
+    # Percentile against industry peers in the local database (see
+    # app.analysis.industry); unrated when there are too few peers.
+    "industry": (
+        3,
+        (
+            SubRating("industry_pct_revenue_growth_ttm", ((0, 0), (1, 1)), "Revenue growth vs peers"),
+            SubRating("industry_pct_operating_margin", ((0, 0), (1, 1)), "Operating margin vs peers"),
+            SubRating("industry_pct_fcf_margin", ((0, 0), (1, 1)), "FCF margin vs peers"),
+            SubRating("industry_pct_roe", ((0, 0), (1, 1)), "Return on equity vs peers"),
+            SubRating("industry_pct_return_6m", ((0, 0), (1, 1)), "6-month return vs peers"),
+        ),
+    ),
 }
 
 UNRATED_REASON = {
     "catalysts": "SEC 8-K events have not been loaded for this stock.",
     "institutional": "Insider (Form 4) filings have not been loaded, and no 13F data is connected.",
-    "industry": "No industry classification or peer data is connected.",
+    "industry": (
+        "Fewer than 4 scored stocks share this industry code. Scan more stocks from the "
+        "same industry in the Screener."
+    ),
 }
 
 

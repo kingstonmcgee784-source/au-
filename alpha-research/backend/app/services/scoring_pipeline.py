@@ -22,7 +22,7 @@ from app.models import FinancialMetric, FinancialStatement, HistoricalPrice, Sto
 from app.providers.base import FundamentalsSource, MarketDataProvider
 from app.schemas.common import DataResponse, DataStatus, UnavailableReason, ok, unavailable
 from app.schemas.stocks import MetricsSnapshot, StockScoreOut
-from app.services import catalysts, ingestion, insiders
+from app.services import catalysts, industry, ingestion, insiders
 from app.services.scores import score_out
 from app.services.stocks import LOCAL_SOURCE, find_stock
 
@@ -92,6 +92,8 @@ def score_stock(
             market_cap=metrics.get("market_cap"),
         )
     )
+    peer_metrics, peer_prefix, _ = industry.industry_metrics(db, stock, metrics)
+    metrics.update(peer_metrics)
     ratings = rate(metrics)
     missing = [key for key in REQUIRED_CATEGORIES if ratings[key].rating is None]
     if missing:
@@ -118,6 +120,12 @@ def score_stock(
     ) + "Thresholds are absolute, not sector-relative (methodology v1)."
     if points["institutional"] is not None:
         notes += " Institutional and insider activity uses Form 4 insider trades only (no 13F)."
+    if points["industry"] is not None:
+        notes += (
+            f" Industry positioning compares {int(metrics['industry_peer_count'] or 0)} peers "
+            f"stored locally with SEC industry code {peer_prefix}"
+            f"{'x' * (4 - len(peer_prefix or ''))}."
+        )
     if points["catalysts"] is not None:
         notes += (
             " Catalysts reflect SEC 8-K event types and an estimated earnings date; they cannot"

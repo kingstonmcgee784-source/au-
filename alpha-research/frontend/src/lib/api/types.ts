@@ -11,7 +11,8 @@ export type UnavailableReason =
   | "no_stored_data"
   | "insufficient_history"
   | "unknown_ticker"
-  | "provider_error";
+  | "provider_error"
+  | "rate_limited";
 
 /** Envelope used by every data endpoint. `data` is null when unavailable. */
 export interface DataResponse<T> {
@@ -298,4 +299,57 @@ export interface TrackRecord {
 
 export interface PriceUpdateResult {
   results: { ticker: string; ok: boolean; message: string }[];
+}
+
+export interface ScanItem {
+  ticker: string;
+  /** pending | scored | not_scored | failed */
+  status: string;
+  score: number | null;
+  message: string | null;
+}
+
+export interface Scan {
+  id: number;
+  name: string;
+  /** queued | running | waiting | done | cancelled */
+  status: string;
+  resume_at: string | null;
+  message: string | null;
+  created_at: string;
+  finished_at: string | null;
+  total: number;
+  completed: number;
+  items: ScanItem[];
+}
+
+export interface ScreenerRow {
+  ticker: string;
+  name: string;
+  industry: string | null;
+  score: number;
+  coverage: number;
+  interpretation: string;
+  risk_class: string | null;
+  scored_on: string;
+  metrics: Record<string, number | null>;
+}
+
+export interface PeerRow {
+  ticker: string;
+  name: string;
+  is_subject: boolean;
+  score: number | null;
+  metrics: Record<string, number | null>;
+}
+
+export interface IndustryComparison {
+  ticker: string;
+  industry: string | null;
+  sic_code: string;
+  peer_group: string;
+  /** metric -> percentile among peers (1 = best) */
+  positioning: Record<string, number | null>;
+  valuation: Record<string, number | null>;
+  rows: PeerRow[];
 }

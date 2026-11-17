@@ -7,6 +7,9 @@
  */
 
 import type {
+  IndustryComparison,
+  Scan,
+  ScreenerRow,
   PriceUpdateResult,
   TrackedCall,
   TrackRecord,
@@ -163,6 +166,25 @@ export const api = {
 
   updateTrackedPrices: () =>
     request<DataResponse<PriceUpdateResult>>("/recommendations/update-prices", { method: "POST" }),
+
+  screener: () => request<ScreenerRow[]>("/screener"),
+
+  scans: (limit = 5) => request<Scan[]>(`/screener/scans?limit=${limit}`),
+
+  startScan: (options: { tickers?: string[]; watchlistId?: number; name?: string }) =>
+    request<Scan>("/screener/scans", {
+      method: "POST",
+      body: JSON.stringify({
+        tickers: options.tickers ?? [],
+        watchlist_id: options.watchlistId ?? null,
+        name: options.name || null,
+      }),
+    }),
+
+  cancelScan: (id: number) => request<Scan>(`/screener/scans/${id}/cancel`, { method: "POST" }),
+
+  industry: (symbol: string) =>
+    request<DataResponse<IndustryComparison>>(`/stocks/${ticker(symbol)}/industry`),
 
   rankings: (limit = 10) => request<DataResponse<RankingEntry[]>>(`/rankings?limit=${limit}`),
 

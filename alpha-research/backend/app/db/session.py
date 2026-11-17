@@ -23,11 +23,16 @@ def build_engine(database_url: str) -> Engine:
     engine = create_engine(database_url, connect_args=connect_args)
 
     if is_sqlite:
-        # SQLite does not enforce foreign keys unless asked to.
+        # SQLite does not enforce foreign keys unless asked to. WAL mode lets the
+        # background scanner write while the API reads, and busy_timeout waits
+        # for a lock instead of failing at once.
         @event.listens_for(engine, "connect")
-        def _enable_foreign_keys(dbapi_connection, _record) -> None:  # type: ignore[no-untyped-def]
+        def _configure_sqlite(dbapi_connection, _record) -> None:  # type: ignore[no-untyped-def]
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA busy_timeout=10000")
+            if make_url(database_url).database not in (None, "", ":memory:"):
+                cursor.execute("PRAGMA journal_mode=WAL")
             cursor.close()
 
     return engine

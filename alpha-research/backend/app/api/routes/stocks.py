@@ -11,6 +11,7 @@ from app.schemas.stocks import (
     EventsSyncResult,
     FinancialsSyncResult,
     FinancialStatementOut,
+    IndustryComparison,
     InsiderActivity,
     InsiderSyncResult,
     MetricsSnapshot,
@@ -23,6 +24,7 @@ from app.schemas.stocks import (
 from app.services import (
     catalysts,
     financials,
+    industry,
     ingestion,
     insiders,
     scores,
@@ -147,3 +149,9 @@ def sync_events(
 def catalyst_feed(db: DbSession, ticker: TickerPath) -> DataResponse[CatalystFeed]:
     """Stored 8-K events, newest first, with an estimated next earnings date."""
     return catalysts.get_catalysts(db, ticker)
+
+
+@router.get("/{ticker}/industry", response_model=DataResponse[IndustryComparison])
+def industry_comparison(db: DbSession, ticker: TickerPath) -> DataResponse[IndustryComparison]:
+    """How the stock ranks against stored peers with the same SEC industry code."""
+    return industry.comparison(db, ticker)

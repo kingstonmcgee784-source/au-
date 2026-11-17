@@ -7,6 +7,7 @@ Usage, from the backend directory:
     python -m app.cli sync-insiders MSFT LIVN PLAB
     python -m app.cli sync-events MSFT LIVN PLAB
     python -m app.cli score MSFT LIVN PLAB
+    python -m app.cli scan MSFT LIVN PLAB ...   (waits out rate limits; can take a while)
 """
 
 import argparse
@@ -20,7 +21,9 @@ from app.schemas.common import DataStatus, normalize_ticker
 from app.services.ingestion import sync_financials, sync_prices
 from app.services.catalysts import sync_events
 from app.services.insiders import sync_insiders
+from app.schemas.screener import ScanRequest
 from app.services.scoring_pipeline import score_stock
+from app.services.screener import create_scan, get_scan, process_scan
 
 
 def _sync_prices(tickers: list[str]) -> int:
@@ -158,6 +161,31 @@ def _score(tickers: list[str]) -> int:
     return 1 if failures else 0
 
 
+def _scan(tickers: list[str]) -> int:
+    settings = get_settings()
+    upgrade_to_head(settings.database_url)
+    try:
+        request = ScanRequest(tickers=tickers)
+    except ValueError as exc:
+        print(exc)
+        return 1
+    with SessionLocal() as db:
+        scan = create_scan(db, request)
+    print(f"Scanning {scan.total} tickers (scan #{scan.id})...")
+    process_scan(
+        scan.id,
+        market=get_market_data_provider(settings),
+        fundamentals=get_fundamentals_client(settings),
+        history_years=settings.price_history_years,
+    )
+    with SessionLocal() as db:
+        result = get_scan(db, scan.id)
+    for item in result.items:
+        detail = f"{item.score:.1f}/100" if item.score is not None else item.message or ""
+        print(f"{item.ticker}: {item.status} {detail}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -171,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
     events.add_argument("tickers", nargs="+")
     score = commands.add_parser("score", help="Refresh data and score tickers")
     score.add_argument("tickers", nargs="+")
+    scan = commands.add_parser("scan", help="Score many tickers, waiting out rate limits")
+    scan.add_argument("tickers", nargs="+")
     args = parser.parse_args(argv)
     if args.command == "sync-prices":
         return _sync_prices(args.tickers)
@@ -182,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
         return _sync_events(args.tickers)
     if args.command == "score":
         return _score(args.tickers)
+    if args.command == "scan":
+        return _scan(args.tickers)
     return 2
 
 

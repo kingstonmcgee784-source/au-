@@ -220,16 +220,56 @@ Rules that keep the score honest:
 - **Missing data is not zero.** A metric whose inputs are missing, or that is
   not meaningful (for example P/E with negative earnings), is left empty.
   Debt that a company does not report is not assumed to be zero.
-- **Unscored category.** Industry positioning has no data source yet, so it is
-  not scored. Institutional and insider activity uses Form 4 insider trades
-  only, and catalysts use 8-K event types. The total is the share of points
-  earned in the categories that were rated, shown with its **coverage**
-  (normally 95%).
+- **Coverage.** Industry positioning is rated only when at least 4 peers with
+  the same SEC industry code have been scored. Institutional and insider
+  activity uses Form 4 insider trades only, and catalysts use 8-K event
+  types. The total is the share of points earned in the categories that were
+  rated, shown with its **coverage**: 100% with enough peers, otherwise 95%.
 - **Core categories are required.** A stock is not scored unless
   fundamentals, valuation, technicals and growth can all be rated.
   Otherwise the app says what data is missing.
 - **Known limitation:** thresholds are absolute, not sector-relative. A score
   is a research aid, not a recommendation.
+
+## Screener and batch scans
+
+On **Stock Screener**, paste tickers and/or choose a watchlist, then click
+**Start scan**. Every stock you score, here or on Stock Analysis, appears in
+the results, which you can filter by score, P/E, revenue growth, market cap,
+dilution, insider buying and risk, and sort by any column. From the command
+line:
+
+```bash
+cd alpha-research/backend && .venv/bin/python -m app.cli scan PLTR LIVN MRCY FLYW HCSG
+```
+
+How a scan runs:
+
+- **In the background:** the scan runs inside the backend, one stock at a
+  time, so you can leave the page. Unfinished scans resume when the backend
+  restarts. Only one scan runs at a time.
+- **Rate limits:** when Tiingo's hourly limit is reached, the scan waits 10
+  minutes and continues on its own. Each new stock uses about 3 Tiingo
+  requests, so expect roughly 15 new stocks an hour on the free plan.
+- **Final pass:** when the list is done, every stock in it is re-scored from
+  stored data, so early stocks are compared with peers scanned after them.
+
+## Industry comparison
+
+A stock's industry is its SEC industry code (SIC), loaded during scoring.
+Its peers are the **other stocks scored in this app** with the same code. If
+there are fewer than 4, the group widens to the first three digits of the
+code, then to the first two.
+
+- **What is compared:** revenue growth, operating margin, FCF margin, return
+  on equity and 6-month return. Each becomes a percentile among the peers,
+  and their average rates the "Industry positioning" category. Scores can now
+  reach **100%** coverage.
+- **Shown for reference only:** valuation relative to peers (P/E, P/S, EV/S,
+  FCF yield). It does not feed the score.
+- **On Stock Analysis:** the **Industry comparison** panel shows the peer
+  table. With fewer than 4 peers, it says so and suggests scanning more
+  stocks from that industry.
 
 ## Performance tracking
 
@@ -294,7 +334,9 @@ cd alpha-research/frontend && npm run lint && npm run build
 | AI report generation | Reports `ai_not_configured` |
 | News & Catalysts (8-K events, estimated earnings date) | Loaded from the SEC filing index on request |
 | Performance tracking (tracked calls vs S&P 500, Nasdaq 100, Russell 2000) | Working, from stored prices |
-| Screener, Backtesting | Pages describe the planned feature; not built |
+| Screener with background batch scans | Working; waits out Tiingo rate limits automatically |
+| Industry comparison (SEC industry code peers) | Working once 4+ peers are scored |
+| Backtesting | Page describes the planned feature; not built |
 
 See [docs/API.md](docs/API.md) for every endpoint and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design decisions.

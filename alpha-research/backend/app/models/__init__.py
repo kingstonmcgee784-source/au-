@@ -11,6 +11,7 @@ from app.models.research import (
     Recommendation,
     ResearchReport,
 )
+from app.models.screener import ScreenRun, ScreenRunItem
 from app.models.stock import HistoricalPrice, Stock
 from app.models.watchlist import Watchlist, WatchlistItem
 
@@ -25,6 +26,8 @@ __all__ = [
     "NewsArticle",
     "Recommendation",
     "ResearchReport",
+    "ScreenRun",
+    "ScreenRunItem",
     "Stock",
     "StockScore",
     "TechnicalIndicator",

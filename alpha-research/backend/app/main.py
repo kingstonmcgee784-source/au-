@@ -15,16 +15,20 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.migrations import upgrade_to_head
+from app.services.screener import ScanRunner
 
 logger = logging.getLogger("alpha_research")
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     if settings.auto_migrate:
         upgrade_to_head(settings.database_url)
         logger.info("Database schema is up to date")
+    app.state.scan_runner = ScanRunner(settings)
+    if settings.environment != "test":
+        app.state.scan_runner.resume_unfinished()
     yield
 
 

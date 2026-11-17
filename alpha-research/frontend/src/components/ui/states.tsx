@@ -44,6 +44,7 @@ const REASON_TITLE: Record<UnavailableReason, string> = {
   insufficient_history: "Not enough price history",
   unknown_ticker: "Ticker not recognized",
   provider_error: "Data provider error",
+  rate_limited: "Request limit reached",
 };
 
 /** Shown when the backend answers `status: "unavailable"`. Never shows numbers. */
