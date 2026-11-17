@@ -46,6 +46,7 @@ export function InsiderPanel({
   return (
     <Panel
       id="insiders"
+      collapsible
       title="Insider activity (Form 4, last 180 days)"
       icon={UserCheck}
       actions={<SyncInsidersButton key={`insiders-${ticker}`} ticker={ticker} onSynced={onSynced} />}

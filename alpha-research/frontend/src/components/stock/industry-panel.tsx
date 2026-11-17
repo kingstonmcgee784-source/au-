@@ -69,7 +69,7 @@ export function IndustryPanel({
   onRetry: () => void;
 }) {
   return (
-    <Panel id="industry" title="Industry comparison" icon={Factory}>
+    <Panel id="industry" title="Industry comparison" icon={Factory} collapsible>
       <DataView state={state} onRetry={onRetry}>
         {(data, response) => (
           <>

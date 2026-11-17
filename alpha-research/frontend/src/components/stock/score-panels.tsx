@@ -203,7 +203,7 @@ export function MetricsPanel({
   onRetry: () => void;
 }) {
   return (
-    <Panel id="key-metrics" title="Key metrics" icon={Calculator}>
+    <Panel id="key-metrics" title="Key metrics" icon={Calculator} collapsible>
       <DataView state={state} onRetry={onRetry}>
         {(snapshot, response) => (
           <>

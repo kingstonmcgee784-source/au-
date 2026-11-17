@@ -68,7 +68,7 @@ export function HoldingPlanPanel({
   onRetry: () => void;
 }) {
   return (
-    <Panel id="holding-plan" title="1–3 month holding plan" icon={CalendarClock}>
+    <Panel id="holding-plan" title="1–3 month holding plan" icon={CalendarClock} collapsible>
       <DataView state={state} onRetry={onRetry}>
         {(plan, response) => {
           const fit = FIT[plan.fit];

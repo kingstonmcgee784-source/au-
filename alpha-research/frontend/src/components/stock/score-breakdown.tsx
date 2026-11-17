@@ -2,13 +2,14 @@
 
 import { ChevronDown, ChevronRight, ListTree } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { DataView } from "@/components/ui/data-view";
 import { Panel } from "@/components/ui/panel";
 import type { CategoryScore, DataResponse, StockScore } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import type { ApiState } from "@/lib/hooks/use-api";
+import { useHashReveal } from "@/lib/hooks/use-hash-reveal";
 
 /** Where to see the raw data behind each category. */
 function detailLink(key: string, ticker: string): { href: string; label: string } | null {
@@ -58,17 +59,30 @@ export function ScoreBreakdownPanel({
   state: ApiState<DataResponse<StockScore>>;
   onRetry: () => void;
 }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Categories start closed; a click (or a link to one) opens it.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
-    setCollapsed((current) => {
+    setExpanded((current) => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
+  const reveal = useCallback(
+    (id: string) =>
+      setExpanded((current) => new Set(current).add(id.replace(/^breakdown-/, ""))),
+    [],
+  );
+  useHashReveal(["breakdown-"], reveal);
 
   return (
-    <Panel title="Score breakdown" icon={ListTree} id="score-breakdown">
+    <Panel
+      title="Score breakdown"
+      icon={ListTree}
+      id="score-breakdown"
+      collapsible
+      opensFor={["breakdown-"]}
+    >
       <DataView state={state} onRetry={onRetry}>
         {(score) => (
           <>
@@ -81,14 +95,14 @@ export function ScoreBreakdownPanel({
                 <button
                   type="button"
                   className="hover:text-accent"
-                  onClick={() => setCollapsed(new Set())}
+                  onClick={() => setExpanded(new Set(score.categories.map((c) => c.key)))}
                 >
                   Expand all
                 </button>
                 <button
                   type="button"
                   className="hover:text-accent"
-                  onClick={() => setCollapsed(new Set(score.categories.map((c) => c.key)))}
+                  onClick={() => setExpanded(new Set())}
                 >
                   Collapse all
                 </button>
@@ -100,7 +114,7 @@ export function ScoreBreakdownPanel({
                   key={category.key}
                   ticker={ticker}
                   category={category}
-                  open={!collapsed.has(category.key)}
+                  open={expanded.has(category.key)}
                   onToggle={() => toggle(category.key)}
                 />
               ))}
