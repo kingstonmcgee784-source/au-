@@ -5,7 +5,7 @@ numbers are made up for the test and only need to add up consistently.
 """
 
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
@@ -18,14 +18,29 @@ from app.api.deps import fundamentals_client
 from app.main import app
 from app.models import FinancialStatement, Stock
 from app.providers.base import ProviderAuthError, TickerNotFoundError
-from app.providers.sec_edgar import SecEdgarClient
+from app.providers.sec_edgar import CompanyInfo, FilingRef, SecEdgarClient
 from app.providers.sec_xbrl import parse_company_facts
 
 
-def fact(val: float, end: str, accn: str, fy: int, fp: str, form: str, filed: str,
-         start: str | None = None) -> dict[str, Any]:
-    row: dict[str, Any] = {"end": end, "val": val, "accn": accn, "fy": fy, "fp": fp,
-                           "form": form, "filed": filed}
+def fact(
+    val: float,
+    end: str,
+    accn: str,
+    fy: int,
+    fp: str,
+    form: str,
+    filed: str,
+    start: str | None = None,
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "end": end,
+        "val": val,
+        "accn": accn,
+        "fy": fy,
+        "fp": fp,
+        "form": form,
+        "filed": filed,
+    }
     if start:
         row["start"] = start
     return row
@@ -51,32 +66,57 @@ COMPANY_FACTS: dict[str, Any] = {
     "facts": {
         "us-gaap": {
             # Revenue: three reported quarters plus 6/9-month and annual totals.
-            "Revenues": {"units": {"USD": [
-                f(100, Q1, "2025-03-31", "2025-01-01"),
-                f(120, Q2, "2025-06-30", "2025-04-01"),
-                f(220, Q2, "2025-06-30", "2025-01-01"),
-                f(130, Q3, "2025-09-30", "2025-07-01"),
-                f(350, Q3, "2025-09-30", "2025-01-01"),
-                f(500, K, "2025-12-31", "2025-01-01"),
-                # A proxy statement repeats the figure; it must be ignored.
-                fact(999, "2025-12-31", "proxy", 2025, "FY", "DEF 14A", "2026-04-01", "2025-01-01"),
-            ]}},
+            "Revenues": {
+                "units": {
+                    "USD": [
+                        f(100, Q1, "2025-03-31", "2025-01-01"),
+                        f(120, Q2, "2025-06-30", "2025-04-01"),
+                        f(220, Q2, "2025-06-30", "2025-01-01"),
+                        f(130, Q3, "2025-09-30", "2025-07-01"),
+                        f(350, Q3, "2025-09-30", "2025-01-01"),
+                        f(500, K, "2025-12-31", "2025-01-01"),
+                        # A proxy statement repeats the figure; it must be ignored.
+                        fact(
+                            999,
+                            "2025-12-31",
+                            "proxy",
+                            2025,
+                            "FY",
+                            "DEF 14A",
+                            "2026-04-01",
+                            "2025-01-01",
+                        ),
+                    ]
+                }
+            },
             # Cash flow is only reported year to date.
-            "NetCashProvidedByUsedInOperatingActivities": {"units": {"USD": [
-                f(10, Q1, "2025-03-31", "2025-01-01"),
-                f(25, Q2, "2025-06-30", "2025-01-01"),
-                f(45, Q3, "2025-09-30", "2025-01-01"),
-                f(70, K, "2025-12-31", "2025-01-01"),
-            ]}},
-            "EarningsPerShareDiluted": {"units": {"USD/shares": [
-                f(0.5, Q3, "2025-09-30", "2025-07-01"),
-                f(1.9, Q3, "2025-09-30", "2025-01-01"),
-                f(2.6, K, "2025-12-31", "2025-01-01"),
-            ]}},
-            "Assets": {"units": {"USD": [
-                f(1000, Q3, "2025-09-30"),
-                f(1100, K, "2025-12-31"),
-            ]}},
+            "NetCashProvidedByUsedInOperatingActivities": {
+                "units": {
+                    "USD": [
+                        f(10, Q1, "2025-03-31", "2025-01-01"),
+                        f(25, Q2, "2025-06-30", "2025-01-01"),
+                        f(45, Q3, "2025-09-30", "2025-01-01"),
+                        f(70, K, "2025-12-31", "2025-01-01"),
+                    ]
+                }
+            },
+            "EarningsPerShareDiluted": {
+                "units": {
+                    "USD/shares": [
+                        f(0.5, Q3, "2025-09-30", "2025-07-01"),
+                        f(1.9, Q3, "2025-09-30", "2025-01-01"),
+                        f(2.6, K, "2025-12-31", "2025-01-01"),
+                    ]
+                }
+            },
+            "Assets": {
+                "units": {
+                    "USD": [
+                        f(1000, Q3, "2025-09-30"),
+                        f(1100, K, "2025-12-31"),
+                    ]
+                }
+            },
         }
     },
 }
@@ -130,10 +170,29 @@ def test_parser_balance_sheet_uses_period_end_values() -> None:
 
 
 def test_parser_prefers_latest_filing_for_restated_periods() -> None:
-    data = {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [
-        f(100, Q1, "2025-03-31", "2025-01-01"),
-        fact(105, "2025-03-31", "q1a", 2025, "Q1", "10-Q/A", "2025-06-01", "2025-01-01"),
-    ]}}}}}
+    data = {
+        "facts": {
+            "us-gaap": {
+                "Revenues": {
+                    "units": {
+                        "USD": [
+                            f(100, Q1, "2025-03-31", "2025-01-01"),
+                            fact(
+                                105,
+                                "2025-03-31",
+                                "q1a",
+                                2025,
+                                "Q1",
+                                "10-Q/A",
+                                "2025-06-01",
+                                "2025-01-01",
+                            ),
+                        ]
+                    }
+                }
+            }
+        }
+    }
     (statement,) = parse_company_facts(data)
     assert statement.line_items["revenue"] == 105
 
@@ -190,9 +249,7 @@ def test_client_lookup_and_facts() -> None:
 
 
 def test_client_explains_403() -> None:
-    client = edgar(
-        {"https://www.sec.gov/files/company_tickers.json": httpx.Response(403)}, []
-    )
+    client = edgar({"https://www.sec.gov/files/company_tickers.json": httpx.Response(403)}, [])
     with pytest.raises(ProviderAuthError, match="SEC_USER_AGENT"):
         client.lookup("TEST")
 
@@ -205,6 +262,8 @@ class FakeSec:
 
     def __init__(self) -> None:
         self.facts = COMPANY_FACTS
+        self.downloads = 0
+        self.filings: list[FilingRef] = []
 
     def lookup(self, ticker: str) -> tuple[int, str]:
         if ticker != "TEST":
@@ -212,7 +271,11 @@ class FakeSec:
         return 123, "Test Holdings Inc"
 
     def company_facts(self, cik: int) -> dict[str, Any]:
+        self.downloads += 1
         return self.facts
+
+    def company_info(self, cik: int) -> CompanyInfo:
+        return CompanyInfo(sic=None, sic_description=None, filings=self.filings)
 
 
 @pytest.fixture
@@ -249,8 +312,12 @@ def test_sync_financials_then_read(client: TestClient, sec: FakeSec, db: Session
     # A period that a newer parse no longer produces is removed.
     stale = FinancialStatement(
         stock_id=db.scalar(select(Stock.id).where(Stock.ticker == "TEST")),
-        statement_type="balance", period_type="quarterly", period_end=date(2025, 11, 20),
-        fiscal_year=2025, line_items={"shares_outstanding": 1.0}, source="sec_edgar",
+        statement_type="balance",
+        period_type="quarterly",
+        period_end=date(2025, 11, 20),
+        fiscal_year=2025,
+        line_items={"shares_outstanding": 1.0},
+        source="sec_edgar",
     )
     db.add(stale)
     db.commit()
@@ -273,13 +340,21 @@ def test_sync_financials_not_configured(client: TestClient) -> None:
 
 def test_subsequent_event_dates_do_not_change_the_period() -> None:
     """A 10-Q can report an event after quarter end (e.g. a dividend declared later)."""
-    data = {"facts": {"us-gaap": {
-        "Revenues": {"units": {"USD": [f(130, Q3, "2025-09-30", "2025-07-01")]}},
-        "NetIncomeLoss": {"units": {"USD": [f(13, Q3, "2025-09-30", "2025-07-01")]}},
-        "CommonStockDividendsPerShareDeclared": {"units": {"USD/shares": [
-            f(0.5, Q3, "2025-10-20", "2025-10-20"),
-        ]}},
-    }}}
+    data = {
+        "facts": {
+            "us-gaap": {
+                "Revenues": {"units": {"USD": [f(130, Q3, "2025-09-30", "2025-07-01")]}},
+                "NetIncomeLoss": {"units": {"USD": [f(13, Q3, "2025-09-30", "2025-07-01")]}},
+                "CommonStockDividendsPerShareDeclared": {
+                    "units": {
+                        "USD/shares": [
+                            f(0.5, Q3, "2025-10-20", "2025-10-20"),
+                        ]
+                    }
+                },
+            }
+        }
+    }
     statements = parse_company_facts(data)
     income = [s for s in statements if s.statement_type == "income"]
     assert [s.period_end for s in income] == [date(2025, 9, 30)]
@@ -288,11 +363,83 @@ def test_subsequent_event_dates_do_not_change_the_period() -> None:
 
 def test_revenue_uses_the_largest_reported_figure() -> None:
     """Some filers put a sub-total under `Revenues` and the total under another tag."""
-    data = {"facts": {"us-gaap": {
-        "Revenues": {"units": {"USD": [f(1398, Q1, "2025-03-31", "2025-01-01")]}},
-        "RevenueFromContractWithCustomerExcludingAssessedTax": {
-            "units": {"USD": [f(1559, Q1, "2025-03-31", "2025-01-01")]}
-        },
-    }}}
+    data = {
+        "facts": {
+            "us-gaap": {
+                "Revenues": {"units": {"USD": [f(1398, Q1, "2025-03-31", "2025-01-01")]}},
+                "RevenueFromContractWithCustomerExcludingAssessedTax": {
+                    "units": {"USD": [f(1559, Q1, "2025-03-31", "2025-01-01")]}
+                },
+            }
+        }
+    }
     (statement,) = parse_company_facts(data)
     assert statement.line_items["revenue"] == 1559
+
+
+def test_fiscal_labels_follow_the_companys_year_end() -> None:
+    """A fiscal year ending in April: the July quarter is Q1 of the next fiscal year,
+    even when the SEC tags it with the calendar year."""
+
+    def filing(accn: str, fy: int, fp: str, form: str, filed: str) -> dict[str, Any]:
+        return {"accn": accn, "fy": fy, "fp": fp, "form": form, "filed": filed}
+
+    rows = [
+        {
+            "start": "2024-04-27",
+            "end": "2025-04-25",
+            "val": 400,
+            **filing("k", 2025, "FY", "10-K", "2025-06-01"),
+        },
+        {
+            "start": "2025-04-26",
+            "end": "2025-07-25",
+            "val": 110,
+            **filing("q1", 2025, "Q1", "10-Q", "2025-08-27"),
+        },
+        {
+            "start": "2025-07-26",
+            "end": "2025-10-24",
+            "val": 120,
+            **filing("q2", 2025, "Q2", "10-Q", "2025-11-25"),
+        },
+    ]
+    statements = by_key(
+        parse_company_facts({"facts": {"us-gaap": {"Revenues": {"units": {"USD": rows}}}}})
+    )
+    july = statements[("income", "quarterly", date(2025, 7, 25))]
+    october = statements[("income", "quarterly", date(2025, 10, 24))]
+    assert (july.fiscal_year, july.fiscal_quarter) == (2026, 1)
+    assert (october.fiscal_year, october.fiscal_quarter) == (2026, 2)
+    assert statements[("income", "annual", date(2025, 4, 25))].fiscal_year == 2025
+
+
+def test_financials_are_not_redownloaded_without_a_new_filing(sec: "FakeSec", db: Session) -> None:
+    from app.services.ingestion import sync_financials
+
+    assert sync_financials(db, sec, "TEST").status == "ok"
+    assert sec.downloads == 1
+    # No 10-Q or 10-K since: the stored statements are used.
+    again = sync_financials(db, sec, "TEST")
+    assert again.status == "ok" and again.data.statements_stored > 0
+    assert sec.downloads == 1
+    # A new 10-Q appears: download again.
+    sec.filings = [FilingRef("new", "10-Q", date.today() + timedelta(days=1), "q.htm")]
+    sync_financials(db, sec, "TEST")
+    assert sec.downloads == 2
+    # A forced load always downloads.
+    sec.filings = []
+    sync_financials(db, sec, "TEST", force=True)
+    assert sec.downloads == 3
+
+
+def test_statements_from_an_older_parser_are_reloaded(sec: "FakeSec", db: Session) -> None:
+    from sqlalchemy import update
+
+    from app.services.ingestion import sync_financials
+
+    sync_financials(db, sec, "TEST")
+    db.execute(update(FinancialStatement).values(parser_version=0))
+    db.commit()
+    sync_financials(db, sec, "TEST")
+    assert sec.downloads == 2

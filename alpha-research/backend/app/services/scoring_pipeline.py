@@ -81,9 +81,7 @@ def score_stock(
         prices=prices,
         benchmark=_prices(db, benchmark.id) if benchmark and benchmark.id != stock.id else [],
     )
-    metrics.update(
-        catalysts.event_metrics(db, stock, today=datetime.now(UTC).date())
-    )
+    metrics.update(catalysts.event_metrics(db, stock, today=datetime.now(UTC).date()))
     metrics.update(
         insiders.insider_metrics(
             db,

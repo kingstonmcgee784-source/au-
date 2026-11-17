@@ -5,14 +5,16 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.analysis.performance import Bar, call_performance, summary
 from app.api.deps import market_data_provider
 from app.main import app
-from app.models import HistoricalPrice, Recommendation, Stock, StockScore
+from app.models import HistoricalPrice, Recommendation, Stock
+from app.services.scoring_pipeline import score_stock
 from tests.fakes import FakeProvider, bars
+from tests.test_scoring_pipeline import FakeSec
 
 START = date(2026, 1, 1)
 
@@ -64,18 +66,14 @@ def market() -> Iterator[FakeProvider]:
     app.dependency_overrides.clear()
 
 
-def scored_stock(db: Session, ticker: str = "TEST", days: int = 100) -> Stock:
-    stock = Stock(ticker=ticker, name="Test Holdings Inc", exchange="NASDAQ")
-    db.add(stock)
-    db.flush()
-    for i in range(days):
-        close = 50.0 + i
-        db.add(HistoricalPrice(stock_id=stock.id, date=START + timedelta(days=i), open=close,
-                               high=close, low=close, close=close, volume=1, source="test"))
-    db.add(StockScore(stock_id=stock.id, as_of=START + timedelta(days=days - 1), total_score=72.0,
-                      category_scores={}, methodology_version="1.0", risk_class="Moderate"))
-    db.commit()
-    return stock
+def scored_stock(db: Session, market: FakeProvider, days: int = 250) -> Stock:
+    """A stock scored through the real pipeline (rising test prices, test SEC facts)."""
+    market.known["TEST"] = bars(START, days, 50.0)
+    result = score_stock(
+        db, "TEST", market=market, fundamentals=FakeSec(), refresh=True, history_years=2
+    )
+    assert result.status == "ok", result.message
+    return db.scalar(select(Stock).where(Stock.ticker == "TEST"))
 
 
 def test_track_requires_a_score(client: TestClient, market: FakeProvider) -> None:
@@ -85,25 +83,35 @@ def test_track_requires_a_score(client: TestClient, market: FakeProvider) -> Non
 
 
 def test_track_and_measure(client: TestClient, market: FakeProvider, db: Session) -> None:
-    stock = scored_stock(db, days=60)
+    stock = scored_stock(db, market)
     created = client.post("/api/v1/recommendations", json={"ticker": "test", "thesis": "Cheap"})
     assert created.status_code == 201
     call = created.json()["data"]
-    assert call["reference_price"] == 109.0  # last stored close
-    assert call["score"] == 72.0 and call["risk_class"] == "Moderate"
+    assert call["reference_price"] == 299.0  # last stored close
+    assert call["score"] is not None and call["risk_class"] is not None
     assert call["performance"]["return_now"] is None  # no prices after the call yet
 
     # The same stock cannot be tracked twice from the same price date.
     assert client.post("/api/v1/recommendations", json={"ticker": "TEST"}).status_code == 409
 
     # Prices arrive later: +10% after a week.
-    for i in range(60, 75):
-        db.add(HistoricalPrice(stock_id=stock.id, date=START + timedelta(days=i), open=1, high=1,
-                               low=1, close=119.9, volume=1, source="test"))
+    for i in range(250, 265):
+        db.add(
+            HistoricalPrice(
+                stock_id=stock.id,
+                date=START + timedelta(days=i),
+                open=1,
+                high=1,
+                low=1,
+                close=328.9,
+                volume=1,
+                source="test",
+            )
+        )
     db.commit()
     record = client.get("/api/v1/recommendations").json()
     perf = record["calls"][0]["performance"]
-    assert perf["return_1w"] == pytest.approx(119.9 / 109 - 1)
+    assert perf["return_1w"] == pytest.approx(328.9 / 299 - 1)
     assert perf["return_1m"] is None
     assert perf["spy_return_1w"] is not None
     assert record["summary"]["1w"]["count"] == 1
@@ -111,8 +119,8 @@ def test_track_and_measure(client: TestClient, market: FakeProvider, db: Session
     assert record["benchmarks_missing"] == []
 
 
-def test_delete_only_on_the_same_day(client: TestClient, market: FakeProvider, db: Session) -> None:
-    scored_stock(db)
+def test_delete_only_within_24_hours(client: TestClient, market: FakeProvider, db: Session) -> None:
+    scored_stock(db, market)
     call_id = client.post("/api/v1/recommendations", json={"ticker": "TEST"}).json()["data"]["id"]
 
     db.execute(
@@ -125,14 +133,13 @@ def test_delete_only_on_the_same_day(client: TestClient, market: FakeProvider, d
     assert refused.status_code == 409
     assert "cannot be edited" in refused.json()["detail"]
 
-    db.execute(update(Recommendation).values(created_at=datetime.now(UTC)))
+    db.execute(update(Recommendation).values(created_at=datetime.now(UTC) - timedelta(hours=20)))
     db.commit()
     assert client.delete(f"/api/v1/recommendations/{call_id}").status_code == 204
 
 
 def test_update_prices(client: TestClient, market: FakeProvider, db: Session) -> None:
-    scored_stock(db)
-    market.known["TEST"] = bars(START, 120, 50.0)
+    scored_stock(db, market)
     client.post("/api/v1/recommendations", json={"ticker": "TEST"})
     body = client.post("/api/v1/recommendations/update-prices").json()
     assert body["status"] == "ok"

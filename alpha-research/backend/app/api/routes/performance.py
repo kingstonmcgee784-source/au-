@@ -19,15 +19,13 @@ def track_record(db: DbSession) -> TrackRecord:
 def track_call(
     db: DbSession, market: MarketData, settings: AppSettings, payload: TrackCallRequest
 ) -> DataResponse[CallOut]:
-    """Record a call at the latest stored price, with the stock's current score."""
-    return performance.track_call(
-        db, market, payload, history_years=settings.price_history_years
-    )
+    """Record a call at the latest stored price, re-scoring the stock at that price first."""
+    return performance.track_call(db, market, payload, history_years=settings.price_history_years)
 
 
 @router.delete("/{call_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_call(db: DbSession, call_id: int) -> Response:
-    """Allowed only on the day the call was recorded."""
+    """Allowed only within 24 hours of the call being recorded."""
     performance.delete_call(db, call_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

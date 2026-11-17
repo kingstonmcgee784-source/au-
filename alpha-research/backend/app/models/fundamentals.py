@@ -39,6 +39,8 @@ class FinancialStatement(SourcedMixin, Base):
     # Line items calculated from other reported figures (e.g. Q4 = year minus
     # nine months) rather than reported directly for this period.
     derived_items: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    # Version of the SEC parser that produced this row (0 = before versions).
+    parser_version: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 class FinancialMetric(SourcedMixin, Base):

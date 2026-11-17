@@ -24,13 +24,19 @@ from app.services.insiders import sync_insiders
 
 
 def form4(
-    rows: str, *, owner: str = "Doe Jane", relationship: str = "", plan_box: str | None = None,
+    rows: str,
+    *,
+    owner: str = "Doe Jane",
+    relationship: str = "",
+    plan_box: str | None = None,
     footnotes: str = "",
+    issuer_cik: str = "0000000001",
 ) -> str:
     plan = f"<aff10b5One>{plan_box}</aff10b5One>" if plan_box is not None else ""
     relationship = relationship or (
         "<isDirector>0</isDirector><isOfficer>1</isOfficer>"
-        "<officerTitle>Chief Financial Officer</officerTitle><isTenPercentOwner>0</isTenPercentOwner>"
+        "<officerTitle>Chief Financial Officer</officerTitle>"
+        "<isTenPercentOwner>0</isTenPercentOwner>"
     )
     return f"""<?xml version="1.0"?>
 <ownershipDocument>
@@ -38,7 +44,7 @@ def form4(
   <documentType>4</documentType>
   <periodOfReport>2026-11-10</periodOfReport>
   {plan}
-  <issuer><issuerCik>0000000001</issuerCik><issuerTradingSymbol>TEST</issuerTradingSymbol></issuer>
+  <issuer><issuerCik>{issuer_cik}</issuerCik><issuerTradingSymbol>TEST</issuerTradingSymbol></issuer>
   <reportingOwner>
     <reportingOwnerId><rptOwnerCik>0000000002</rptOwnerCik><rptOwnerName>{owner}</rptOwnerName></reportingOwnerId>
     <reportingOwnerRelationship>{relationship}</reportingOwnerRelationship>
@@ -57,9 +63,19 @@ def form4(
 </ownershipDocument>"""
 
 
-def row(code: str, shares: float, price: float | None, direction: str, day: str = "2026-11-10",
-        footnote: str = "") -> str:
-    price_xml = f"<transactionPricePerShare><value>{price}</value>{footnote}</transactionPricePerShare>" if price is not None else ""
+def row(
+    code: str,
+    shares: float,
+    price: float | None,
+    direction: str,
+    day: str = "2026-11-10",
+    footnote: str = "",
+) -> str:
+    price_xml = (
+        f"<transactionPricePerShare><value>{price}</value>{footnote}</transactionPricePerShare>"
+        if price is not None
+        else ""
+    )
     return f"""<nonDerivativeTransaction>
       <securityTitle><value>Common Stock</value></securityTitle>
       <transactionDate><value>{day}</value></transactionDate>
@@ -93,7 +109,9 @@ def test_10b5_1_from_checkbox_or_footnote() -> None:
     by_note = parse_form4(
         form4(
             row("S", 10, 30, "D", footnote='<footnoteId id="F1"/>'),
-            footnotes='<footnote id="F1">Sold under a Rule 10b5-1 trading plan adopted May 1.</footnote>',
+            footnotes=(
+                '<footnote id="F1">Sold under a Rule 10b5-1 trading plan adopted May 1.</footnote>'
+            ),
         )
     )
     assert by_note.trades[0].under_10b5_1 is True
@@ -104,7 +122,9 @@ def test_10b5_1_from_checkbox_or_footnote() -> None:
 
 def test_roles_for_directors_and_large_holders() -> None:
     parsed = parse_form4(
-        form4("", relationship="<isDirector>1</isDirector><isTenPercentOwner>true</isTenPercentOwner>")
+        form4(
+            "", relationship="<isDirector>1</isDirector><isTenPercentOwner>true</isTenPercentOwner>"
+        )
     )
     assert parsed.owner_role == "Director, 10% owner"
     assert parsed.trades == []
@@ -164,10 +184,14 @@ class FakeSec:
         return {"facts": {}}
 
     def company_info(self, cik: int) -> CompanyInfo:
-        filings = [FilingRef(acc, "4", self.filed, f"xslF345X05/{acc}.xml") for acc in self.documents]
+        filings = [
+            FilingRef(acc, "4", self.filed, f"xslF345X05/{acc}.xml") for acc in self.documents
+        ]
         filings.append(FilingRef("old", "4", self.filed - timedelta(days=400), "old.xml"))
         filings.append(FilingRef("10q", "10-Q", self.filed, "q.htm"))
-        return CompanyInfo(sic="7372", sic_description="SERVICES-PREPACKAGED SOFTWARE", filings=filings)
+        return CompanyInfo(
+            sic="7372", sic_description="SERVICES-PREPACKAGED SOFTWARE", filings=filings
+        )
 
     def filing_document(self, cik: int, filing: FilingRef) -> str:
         self.downloads.append(filing.accession)
@@ -223,3 +247,28 @@ def test_activity_endpoint(client: TestClient, sec: FakeSec) -> None:
     ]
     assert rows[0]["value"] == 20000
     assert body["data"]["summary"]["insider_buyers"] == 1
+
+
+def test_form4_about_another_company_is_not_counted(db: Session) -> None:
+    """A company's index also lists Form 4s it files as owner of another company's shares."""
+    fake = FakeSec(
+        {
+            "own": form4(row("P", 1000, 20.0, "A", day="2026-11-01")),
+            "stake": form4(
+                row("P", 5_000_000, 3.0, "A", day="2026-11-02"),
+                owner="Test Holdings Inc",
+                issuer_cik="0000009999",
+            ),
+        },
+        filed=TODAY - timedelta(days=5),
+    )
+    result = sync_insiders(db, fake, "TEST", today=TODAY)
+    assert result.data is not None
+    assert result.data.transactions_added == 1
+    assert result.data.other_issuer_filings == 1
+
+    # The same filing stored for a second company does not violate uniqueness.
+    other = FakeSec({"stake": fake.documents["stake"]}, filed=TODAY - timedelta(days=5))
+    other.lookup = lambda ticker: (9999, "Other Co")  # type: ignore[method-assign]
+    second = sync_insiders(db, other, "OTHR", today=TODAY)
+    assert second.data is not None and second.data.transactions_added == 1

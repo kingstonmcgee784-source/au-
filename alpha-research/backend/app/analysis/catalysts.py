@@ -42,8 +42,17 @@ IGNORED_ITEMS = {"9.01"}  # exhibits attached to the filing
 
 # Order used to pick the headline item of a filing.
 PRIORITY = [
-    "red_flag", "acquisition", "earnings", "agreement", "review", "dilution",
-    "financing", "management", "other", "disclosure", "governance",
+    "red_flag",
+    "acquisition",
+    "earnings",
+    "agreement",
+    "review",
+    "dilution",
+    "financing",
+    "management",
+    "other",
+    "disclosure",
+    "governance",
 ]
 RED_FLAG_WEIGHT = {"1.03": 1.0, "2.06": 1.0, "4.02": 1.0, "4.01": 0.5}
 MATERIAL_KINDS = {"agreement", "acquisition"}
@@ -126,5 +135,7 @@ def catalyst_metrics(events: Sequence[Event], today: date) -> dict[str, float | 
         "catalyst_earnings_within_90d": (
             1.0 if days_to_earnings is not None and 0 <= days_to_earnings <= 90 else 0.0
         ),
-        "days_to_estimated_earnings": float(days_to_earnings) if days_to_earnings is not None else None,
+        "days_to_estimated_earnings": float(days_to_earnings)
+        if days_to_earnings is not None
+        else None,
     }

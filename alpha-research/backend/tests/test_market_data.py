@@ -78,8 +78,9 @@ def test_sync_is_incremental(provider: FakeProvider, db: Session) -> None:
 
     second = sync_prices(db, provider, "LIVN", history_years=2, today=TODAY, force=True)
     assert second.data is not None
-    # Only days after the newest stored bar are requested and stored.
-    assert provider.price_requests[-1][1] == date(2026, 6, 2)
+    # Only the newest stored day (to detect re-adjusted prices) and later days
+    # are requested; only later days are stored.
+    assert provider.price_requests[-1][1] == date(2026, 6, 1)
     assert second.data.bars_stored == added_first + second.data.bars_added
 
     again = sync_prices(db, provider, "LIVN", history_years=2, today=TODAY, force=True)
@@ -123,3 +124,19 @@ def test_sync_fills_missing_exchange(provider: FakeProvider, db: Session) -> Non
     stock = db.scalar(select(Stock).where(Stock.ticker == "LIVN"))
     assert stock.exchange == "NASDAQ"
     assert stock.name == "LivaNova PLC"  # the SEC name is kept
+
+
+def test_split_or_dividend_reloads_history(provider: FakeProvider, db: Session) -> None:
+    """When adjusted prices are re-based, stored history is replaced, not mixed."""
+    sync_prices(db, provider, "LIVN", history_years=2, today=date(2026, 6, 1))
+    # A 2-for-1 split: the provider now reports every past adjusted close halved.
+    provider.known["LIVN"] = bars(date(2026, 1, 1), 300, adjust=0.5)
+    result = sync_prices(db, provider, "LIVN", history_years=2, today=TODAY, force=True)
+    assert result.data is not None
+    stored = db.scalars(
+        select(HistoricalPrice).where(HistoricalPrice.date == date(2026, 1, 1))
+    ).all()
+    assert [row.adjusted_close for row in stored] == [50.0]  # re-based, one row per day
+    assert result.data.bars_stored == len(
+        {b.date for b in provider.known["LIVN"] if b.date <= TODAY}
+    )

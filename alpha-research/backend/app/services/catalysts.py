@@ -16,7 +16,7 @@ from app.models import NewsArticle, Stock
 from app.providers.base import FundamentalsSource, ProviderError
 from app.schemas.common import DataResponse, UnavailableReason, ok, unavailable
 from app.schemas.stocks import CatalystEvent, CatalystFeed, EventItem, EventsSyncResult
-from app.services.stocks import LOCAL_SOURCE, find_stock, provider_failure
+from app.services.stocks import LOCAL_SOURCE, find_stock, get_or_create_stock, provider_failure
 
 LOOKBACK_DAYS = 400  # a little over a year, enough to estimate the earnings rhythm
 FORMS = {"8-K", "8-K/A"}
@@ -40,10 +40,7 @@ def sync_events(
     except ProviderError as exc:
         return provider_failure(exc, ticker)
 
-    stock = find_stock(db, ticker)
-    if stock is None:
-        stock = Stock(ticker=ticker, name=company_name)
-        db.add(stock)
+    stock = get_or_create_stock(db, ticker, company_name)
     if info.exchanges and not stock.exchange:
         stock.exchange = info.exchanges[0].upper()
     if info.sic_description and not stock.industry:
@@ -70,7 +67,9 @@ def sync_events(
                 headline=(top.label if top else "Filing with exhibits only")[:512],
                 url=url,
                 publisher="SEC EDGAR",
-                published_at=datetime(filing.filed.year, filing.filed.month, filing.filed.day, tzinfo=UTC),
+                published_at=datetime(
+                    filing.filed.year, filing.filed.month, filing.filed.day, tzinfo=UTC
+                ),
                 summary=", ".join(f"{i.code} {i.label}" for i in items) or None,
                 category=top.kind if top else "other",
                 form=filing.form,
@@ -110,7 +109,9 @@ def event_metrics(db: Session, stock: Stock, *, today: date) -> dict[str, float 
     """Catalyst metrics for scoring; empty when events were never loaded."""
     if stock.events_synced_at is None:
         return {}
-    events = [Event(row.published_at.date(), tuple(row.items or [])) for row in _events(db, stock.id)]
+    events = [
+        Event(row.published_at.date(), tuple(row.items or [])) for row in _events(db, stock.id)
+    ]
     return catalyst_metrics(events, today)
 
 

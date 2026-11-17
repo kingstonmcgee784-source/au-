@@ -3,6 +3,7 @@
 import logging
 
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Stock
@@ -22,6 +23,27 @@ LOCAL_SOURCE = "local_database"
 
 def find_stock(db: Session, ticker: str) -> Stock | None:
     return db.scalar(select(Stock).where(Stock.ticker == ticker))
+
+
+def get_or_create_stock(db: Session, ticker: str, name: str, **fields: str | None) -> Stock:
+    """The stored stock for `ticker`, creating it if needed.
+
+    Safe when another request or the background scanner creates the same
+    stock at the same moment: the insert runs in a savepoint, and on a
+    unique-ticker conflict the other row is used instead.
+    """
+    stock = find_stock(db, ticker)
+    if stock is not None:
+        return stock
+    try:
+        with db.begin_nested():
+            stock = Stock(ticker=ticker, name=name, **fields)
+            db.add(stock)
+    except IntegrityError:
+        stock = find_stock(db, ticker)
+        if stock is None:
+            raise
+    return stock
 
 
 def no_stored_stock(ticker: str) -> str:
@@ -81,15 +103,14 @@ def get_profile(
     except ProviderError as exc:
         return provider_failure(exc, ticker)
     # Keep it, so later visits do not spend another provider request.
-    db.add(
-        Stock(
-            ticker=ticker,
-            name=profile.name,
-            exchange=profile.exchange,
-            sector=profile.sector,
-            industry=profile.industry,
-            currency=profile.currency,
-        )
+    get_or_create_stock(
+        db,
+        ticker,
+        profile.name,
+        exchange=profile.exchange,
+        sector=profile.sector,
+        industry=profile.industry,
+        currency=profile.currency,
     )
     db.commit()
     return ok(profile, source=provider.name)

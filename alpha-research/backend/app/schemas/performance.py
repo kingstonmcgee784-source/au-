@@ -25,7 +25,7 @@ class CallOut(BaseModel):
     thesis: str | None
     horizon_days: int
     created_at: datetime
-    # True only on the day the call was recorded (see services.performance).
+    # True only within 24 hours of the call being recorded (see services.performance).
     deletable: bool
     # return_now, return_1w/1m/3m, max_gain, max_drawdown, benchmark returns
     # and excess returns; None means pending or not available.

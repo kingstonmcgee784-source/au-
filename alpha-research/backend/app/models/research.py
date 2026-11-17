@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, Date, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, SourcedMixin, TimestampMixin, UTCDateTime, utcnow
@@ -84,10 +84,15 @@ class InsiderFiling(SourcedMixin, Base):
     is not downloaded again."""
 
     __tablename__ = "insider_filings"
+    # One Form 4 can appear in two companies' filing indexes (the issuer's and
+    # a corporate owner's), so an accession is unique per stock only.
+    __table_args__ = (
+        UniqueConstraint("stock_id", "accession", name="uq_insider_filings_stock_accession"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     stock_id: Mapped[int] = mapped_column(ForeignKey("stocks.id", ondelete="CASCADE"), index=True)
-    accession: Mapped[str] = mapped_column(String(32), unique=True)
+    accession: Mapped[str] = mapped_column(String(32))
     filed_on: Mapped[date] = mapped_column(Date, index=True)
     owner_name: Mapped[str] = mapped_column(String(255))
     owner_role: Mapped[str] = mapped_column(String(255))

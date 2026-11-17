@@ -285,7 +285,7 @@ export interface TrackedCall {
   thesis: string | null;
   horizon_days: number;
   created_at: string;
-  /** True only on the day the call was recorded. */
+  /** True only within 24 hours of the call being recorded. */
   deletable: boolean;
   /** Returns as fractions; null means pending or not available. */
   performance: Record<string, number | null>;

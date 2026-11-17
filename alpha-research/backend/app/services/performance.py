@@ -1,11 +1,11 @@
 """Record calls and measure them against later prices and the benchmarks.
 
-Recorded calls are never edited. A call can be deleted only on the day it was
-recorded, to fix a mistake; after that it stays in the track record, good or
-bad.
+Recorded calls are never edited. A call can be deleted only within 24 hours of
+being recorded, to fix a mistake; after that it stays in the track record,
+good or bad.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -22,10 +22,12 @@ from app.schemas.performance import (
     TrackCallRequest,
     TrackRecord,
 )
-from app.services import ingestion
+from app.services import ingestion, scoring_pipeline
 from app.services.stocks import LOCAL_SOURCE, find_stock
 
 BENCHMARKS = ("SPY", "QQQ", "IWM")
+# Long enough to fix a mistake, short enough that results cannot be curated.
+DELETE_WINDOW = timedelta(hours=24)
 
 
 def track_call(
@@ -77,14 +79,24 @@ def track_call(
         ingestion.sync_prices(db, market, symbol, history_years=history_years)
 
     reference = latest.adjusted_close if latest.adjusted_close is not None else latest.close
+    # Re-score from stored data (no network), so the recorded score is the one
+    # for this price date rather than an older score.
+    current = scoring_pipeline.score_stock(
+        db, ticker, market=None, fundamentals=None, refresh=False, history_years=history_years
+    )
+    if current.status != DataStatus.OK or current.data is None:
+        return unavailable(
+            current.reason or UnavailableReason.NO_STORED_DATA,
+            f"Could not score {ticker} at its latest price: {current.message}",
+        )
     call = Recommendation(
         stock_id=stock.id,
         recommended_on=latest.date,
         reference_price=reference,
         reference_price_source=f"{latest.source} adjusted close on {latest.date.isoformat()}",
         horizon_days=request.horizon_days,
-        score_at_recommendation=score.total_score,
-        risk_class=score.risk_class,
+        score_at_recommendation=current.data.total_score,
+        risk_class=current.data.risk_class,
         thesis=request.thesis,
         status="open",
     )
@@ -120,9 +132,9 @@ def delete_call(db: Session, call_id: int) -> None:
     call = db.get(Recommendation, call_id)
     if call is None:
         raise NotFoundError(f"Tracked call {call_id} does not exist")
-    if call.created_at.date() != datetime.now(UTC).date():
+    if datetime.now(UTC) - call.created_at > DELETE_WINDOW:
         raise ConflictError(
-            "Recorded calls can only be removed on the day they were made, so the track "
+            "Recorded calls can only be removed within 24 hours of being made, so the track "
             "record cannot be edited after the fact."
         )
     db.delete(call)
@@ -191,7 +203,7 @@ def _call_out(
         thesis=call.thesis,
         horizon_days=call.horizon_days,
         created_at=call.created_at,
-        deletable=call.created_at.date() == datetime.now(UTC).date(),
+        deletable=datetime.now(UTC) - call.created_at <= DELETE_WINDOW,
         performance=call_performance(
             call.recommended_on, call.reference_price, _series(db, stock.id), benchmarks
         ),

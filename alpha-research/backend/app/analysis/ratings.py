@@ -45,12 +45,20 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
     "fundamentals": (
         3,
         (
-            SubRating("operating_margin", ((-0.10, 0.0), (0.0, 0.3), (0.25, 1.0)), "Operating margin"),
-            SubRating("fcf_margin", ((-0.10, 0.0), (0.0, 0.3), (0.20, 1.0)), "Free cash flow margin"),
+            SubRating(
+                "operating_margin", ((-0.10, 0.0), (0.0, 0.3), (0.25, 1.0)), "Operating margin"
+            ),
+            SubRating(
+                "fcf_margin", ((-0.10, 0.0), (0.0, 0.3), (0.20, 1.0)), "Free cash flow margin"
+            ),
             SubRating("roe", ((0.0, 0.0), (0.25, 1.0)), "Return on equity"),
             SubRating("current_ratio", ((0.8, 0.0), (1.2, 0.5), (2.0, 1.0)), "Current ratio"),
             SubRating("debt_to_equity", ((0.0, 1.0), (1.0, 0.5), (2.5, 0.0)), "Debt to equity"),
-            SubRating("share_change_yoy", ((-0.02, 1.0), (0.0, 0.9), (0.05, 0.4), (0.10, 0.0)), "Share dilution"),
+            SubRating(
+                "share_change_yoy",
+                ((-0.02, 1.0), (0.0, 0.9), (0.05, 0.4), (0.10, 0.0)),
+                "Share dilution",
+            ),
         ),
     ),
     "valuation": (
@@ -59,7 +67,9 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
             SubRating("pe_ttm", ((10, 1.0), (20, 0.7), (35, 0.35), (60, 0.0)), "P/E (TTM)"),
             SubRating("ev_to_ebitda", ((8, 1.0), (15, 0.6), (30, 0.2), (50, 0.0)), "EV/EBITDA"),
             SubRating("price_to_sales", ((1, 1.0), (4, 0.6), (10, 0.25), (20, 0.0)), "Price/sales"),
-            SubRating("fcf_yield", ((-0.02, 0.0), (0.0, 0.2), (0.04, 0.6), (0.08, 1.0)), "FCF yield"),
+            SubRating(
+                "fcf_yield", ((-0.02, 0.0), (0.0, 0.2), (0.04, 0.6), (0.08, 1.0)), "FCF yield"
+            ),
         ),
     ),
     "technical": (
@@ -73,25 +83,57 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
                 "Price vs 200-day average",
             ),
             SubRating("sma50_above_sma200", ((0.0, 0.0), (1.0, 1.0)), "50-day above 200-day"),
-            SubRating("rsi_14", ((25, 0.2), (45, 0.7), (55, 1.0), (68, 1.0), (80, 0.4)), "RSI (14)"),
-            SubRating("relative_strength_6m", ((-0.25, 0.0), (0.0, 0.5), (0.25, 1.0)), "6-month return vs S&P 500"),
+            SubRating(
+                "rsi_14", ((25, 0.2), (45, 0.7), (55, 1.0), (68, 1.0), (80, 0.4)), "RSI (14)"
+            ),
+            SubRating(
+                "relative_strength_6m",
+                ((-0.25, 0.0), (0.0, 0.5), (0.25, 1.0)),
+                "6-month return vs S&P 500",
+            ),
         ),
     ),
     "growth": (
         2,
         (
-            SubRating("revenue_growth_yoy", ((-0.10, 0.0), (0.0, 0.25), (0.30, 1.0)), "Revenue growth (latest quarter)"),
-            SubRating("revenue_growth_ttm", ((-0.10, 0.0), (0.0, 0.25), (0.30, 1.0)), "Revenue growth (TTM)"),
-            SubRating("net_income_growth_ttm", ((-0.20, 0.0), (0.0, 0.3), (0.40, 1.0)), "Net income growth (TTM)"),
-            SubRating("revenue_acceleration", ((-0.10, 0.0), (0.0, 0.5), (0.10, 1.0)), "Revenue growth acceleration"),
+            SubRating(
+                "revenue_growth_yoy",
+                ((-0.10, 0.0), (0.0, 0.25), (0.30, 1.0)),
+                "Revenue growth (latest quarter)",
+            ),
+            SubRating(
+                "revenue_growth_ttm",
+                ((-0.10, 0.0), (0.0, 0.25), (0.30, 1.0)),
+                "Revenue growth (TTM)",
+            ),
+            SubRating(
+                "net_income_growth_ttm",
+                ((-0.20, 0.0), (0.0, 0.3), (0.40, 1.0)),
+                "Net income growth (TTM)",
+            ),
+            SubRating(
+                "revenue_acceleration",
+                ((-0.10, 0.0), (0.0, 0.5), (0.10, 1.0)),
+                "Revenue growth acceleration",
+            ),
         ),
     ),
     "risk_reward": (
         2,
         (
-            SubRating("volatility_1y", ((0.20, 1.0), (0.40, 0.6), (0.80, 0.0)), "Volatility (1 year)"),
-            SubRating("max_drawdown_1y", ((-0.60, 0.0), (-0.30, 0.5), (-0.10, 1.0)), "Max drawdown (1 year)"),
-            SubRating("from_52w_high", ((-0.50, 0.3), (-0.20, 0.8), (-0.05, 0.6), (0.0, 0.4)), "Distance from 52-week high"),
+            SubRating(
+                "volatility_1y", ((0.20, 1.0), (0.40, 0.6), (0.80, 0.0)), "Volatility (1 year)"
+            ),
+            SubRating(
+                "max_drawdown_1y",
+                ((-0.60, 0.0), (-0.30, 0.5), (-0.10, 1.0)),
+                "Max drawdown (1 year)",
+            ),
+            SubRating(
+                "from_52w_high",
+                ((-0.50, 0.3), (-0.20, 0.8), (-0.05, 0.6), (0.0, 0.4)),
+                "Distance from 52-week high",
+            ),
         ),
     ),
     # Insider (Form 4) activity only: 13F institutional holdings are not
@@ -100,7 +142,11 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
     "institutional": (
         1,
         (
-            SubRating("insider_buyers", ((0, 0.5), (1, 0.75), (3, 1.0)), "Insider open-market buyers (180 days)"),
+            SubRating(
+                "insider_buyers",
+                ((0, 0.5), (1, 0.75), (3, 1.0)),
+                "Insider open-market buyers (180 days)",
+            ),
             SubRating(
                 "insider_discretionary_sales_to_market_cap",
                 ((0.0, 0.7), (0.001, 0.5), (0.01, 0.2), (0.03, 0.0)),
@@ -114,14 +160,20 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
     "catalysts": (
         2,
         (
-            SubRating("catalyst_red_flags_365d", ((0, 0.8), (1, 0.3), (2, 0.0)), "Red-flag filings (12 months)"),
+            SubRating(
+                "catalyst_red_flags_365d",
+                ((0, 0.8), (1, 0.3), (2, 0.0)),
+                "Red-flag filings (12 months)",
+            ),
             SubRating(
                 "catalyst_material_events_180d",
                 ((0, 0.5), (1, 0.7), (3, 0.9)),
                 "Material agreements and acquisitions (6 months)",
             ),
             SubRating(
-                "catalyst_earnings_within_90d", ((0, 0.4), (1, 0.7)), "Earnings release expected within 90 days"
+                "catalyst_earnings_within_90d",
+                ((0, 0.4), (1, 0.7)),
+                "Earnings release expected within 90 days",
             ),
         ),
     ),
@@ -130,8 +182,12 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
     "industry": (
         3,
         (
-            SubRating("industry_pct_revenue_growth_ttm", ((0, 0), (1, 1)), "Revenue growth vs peers"),
-            SubRating("industry_pct_operating_margin", ((0, 0), (1, 1)), "Operating margin vs peers"),
+            SubRating(
+                "industry_pct_revenue_growth_ttm", ((0, 0), (1, 1)), "Revenue growth vs peers"
+            ),
+            SubRating(
+                "industry_pct_operating_margin", ((0, 0), (1, 1)), "Operating margin vs peers"
+            ),
             SubRating("industry_pct_fcf_margin", ((0, 0), (1, 1)), "FCF margin vs peers"),
             SubRating("industry_pct_roe", ((0, 0), (1, 1)), "Return on equity vs peers"),
             SubRating("industry_pct_return_6m", ((0, 0), (1, 1)), "6-month return vs peers"),

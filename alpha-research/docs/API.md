@@ -193,7 +193,7 @@ limit is reached.
 |---|---|---|
 | `GET /recommendations` | | `TrackRecord`: every call with its `performance`, plus `summary` statistics for horizons `1w`, `1m`, `3m` and `now`, and `benchmarks_missing` |
 | `POST /recommendations` | `{"ticker": "PLTR", "thesis": "...", "horizon_days": 90}` | 201, envelope of `TrackedCall`. Needs a stored score and price (`no_stored_data` otherwise). 409 if the stock is already tracked from that price date |
-| `DELETE /recommendations/{id}` | | 204 on the day the call was recorded, otherwise 409 |
+| `DELETE /recommendations/{id}` | | 204 within 24 hours of the call being recorded, otherwise 409 |
 | `POST /recommendations/update-prices` | | Refreshes prices for tracked stocks and SPY, QQQ, IWM |
 
 In `performance`, returns are fractions:

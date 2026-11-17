@@ -36,8 +36,16 @@ def test_classify_and_headline() -> None:
 
 
 def test_earnings_estimate_uses_last_years_timing() -> None:
-    releases = [date(2025, 2, 3), date(2025, 5, 5), date(2025, 8, 4), date(2025, 11, 3),
-                date(2026, 2, 2), date(2026, 5, 4), date(2026, 8, 3), date(2026, 11, 2)]
+    releases = [
+        date(2025, 2, 3),
+        date(2025, 5, 5),
+        date(2025, 8, 4),
+        date(2025, 11, 3),
+        date(2026, 2, 2),
+        date(2026, 5, 4),
+        date(2026, 8, 3),
+        date(2026, 11, 2),
+    ]
     assert estimate_next_earnings(releases, TODAY) == date(2027, 2, 2)
     # Short history: last release plus a quarter.
     assert estimate_next_earnings([date(2026, 11, 2)], TODAY) == date(2027, 2, 1)
@@ -58,10 +66,20 @@ def test_catalyst_metrics_and_rating() -> None:
     assert m["catalyst_material_events_180d"] == 1.0
     assert m["catalyst_earnings_within_90d"] == 1.0
 
-    clean = rate({"catalyst_red_flags_365d": 0, "catalyst_material_events_180d": 0,
-                  "catalyst_earnings_within_90d": 1})
-    flagged = rate({"catalyst_red_flags_365d": 2, "catalyst_material_events_180d": 0,
-                    "catalyst_earnings_within_90d": 0})
+    clean = rate(
+        {
+            "catalyst_red_flags_365d": 0,
+            "catalyst_material_events_180d": 0,
+            "catalyst_earnings_within_90d": 1,
+        }
+    )
+    flagged = rate(
+        {
+            "catalyst_red_flags_365d": 2,
+            "catalyst_material_events_180d": 0,
+            "catalyst_earnings_within_90d": 0,
+        }
+    )
     assert clean["catalysts"].rating > flagged["catalysts"].rating
     assert rate({})["catalysts"].rating is None
 
@@ -116,7 +134,10 @@ def test_sync_events_stores_8ks_once(sec: FakeSec, db: Session) -> None:
     assert stock.industry == "Search, Detection, Navigation, Guidance"
     assert stock.events_synced_at is not None
     rows = db.scalars(select(NewsArticle).order_by(NewsArticle.published_at.desc())).all()
-    assert [(r.category, r.items) for r in rows] == [("earnings", ["2.02", "9.01"]), ("agreement", ["1.01"])]
+    assert [(r.category, r.items) for r in rows] == [
+        ("earnings", ["2.02", "9.01"]),
+        ("agreement", ["1.01"]),
+    ]
 
 
 def test_catalyst_feed_endpoint(client: TestClient, sec: FakeSec) -> None:

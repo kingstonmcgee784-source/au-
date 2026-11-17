@@ -107,6 +107,9 @@ Notes on the data:
   not the consolidated tape, and the app labels it that way.
 - **The market overview** shows the SPY, QQQ, IWM and DIA ETFs as proxies
   for the indexes, labelled as ETFs.
+- **Splits and dividends:** each price sync re-checks the newest stored day.
+  If Tiingo's adjusted price for it has changed, the stock's full history is
+  reloaded, so stored prices never mix bases.
 - **Request limits:** Tiingo's free plan allows 50 requests an hour and 1,000 a
   day. To stay within that:
   - Quotes are cached for 10 minutes. When the limit is hit, the last cached
@@ -248,6 +251,8 @@ How a scan runs:
 - **In the background:** the scan runs inside the backend, one stock at a
   time, so you can leave the page. Unfinished scans resume when the backend
   restarts. Only one scan runs at a time.
+- **SEC downloads:** a company's full financial data is downloaded again only
+  when it has filed a new 10-Q or 10-K, or when the app's parser has changed.
 - **Rate limits:** when Tiingo's hourly limit is reached, the scan waits 10
   minutes and continues on its own. Each new stock uses about 3 Tiingo
   requests, so expect roughly 15 new stocks an hour on the free plan.
@@ -290,8 +295,9 @@ call:
 - **Update prices:** refreshes the tracked stocks and the benchmarks, at most
   every 6 hours each.
 - **No rewriting history:** calls cannot be edited, and can be removed only
-  on the day they were recorded. The same stock cannot be tracked twice from
-  the same price date.
+  within 24 hours of being recorded. The same stock cannot be tracked twice
+  from the same price date. Tracking re-scores the stock from stored data
+  first, so the recorded score matches the recorded price.
 
 ## Database
 

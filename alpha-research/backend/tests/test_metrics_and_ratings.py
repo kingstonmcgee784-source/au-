@@ -7,7 +7,9 @@ from app.analysis.metrics import Period, PricePoint, compute_metrics, price_metr
 from app.analysis.ratings import interpolate, rate, risk_class
 
 
-def quarters(values: list[dict[str, float | None]], last_end: date = date(2026, 9, 30)) -> list[Period]:
+def quarters(
+    values: list[dict[str, float | None]], last_end: date = date(2026, 9, 30)
+) -> list[Period]:
     """Quarterly periods, newest first, about 91 days apart."""
     return [Period(end=last_end - timedelta(days=91 * i), items=v) for i, v in enumerate(values)]
 
@@ -19,8 +21,16 @@ def test_ttm_valuation_and_margins() -> None:
         * 4
     )
     balance = quarters(
-        [{"shares_outstanding": 10, "cash_and_equivalents": 50, "long_term_debt": 30,
-          "stockholders_equity": 200, "current_assets": 300, "current_liabilities": 150}]
+        [
+            {
+                "shares_outstanding": 10,
+                "cash_and_equivalents": 50,
+                "long_term_debt": 30,
+                "stockholders_equity": 200,
+                "current_assets": 300,
+                "current_liabilities": 150,
+            }
+        ]
     )
     m = compute_metrics(income, cashflow, balance, [PricePoint(date(2026, 9, 30), 40.0)])
 
@@ -65,7 +75,9 @@ def test_growth() -> None:
 
 
 def test_growth_undefined_from_negative_base() -> None:
-    income = quarters([{"revenue": 10, "net_income": 5}] * 4 + [{"revenue": 10, "net_income": -5}] * 4)
+    income = quarters(
+        [{"revenue": 10, "net_income": 5}] * 4 + [{"revenue": 10, "net_income": -5}] * 4
+    )
     assert compute_metrics(income, [], [], [])["net_income_growth_ttm"] is None
 
 
@@ -113,5 +125,18 @@ def test_risk_class() -> None:
     assert risk_class({"volatility_1y": 0.18, "market_cap": 5e9}) == "Low"
     assert risk_class({"volatility_1y": 0.45, "market_cap": 5e9}) == "Elevated"
     assert risk_class({"volatility_1y": 0.18, "market_cap": 1e8}) == "High"  # micro cap
-    assert risk_class({"volatility_1y": 0.6, "market_cap": 5e9, "net_income_ttm": -1}) == "Speculative"
+    assert (
+        risk_class({"volatility_1y": 0.6, "market_cap": 5e9, "net_income_ttm": -1}) == "Speculative"
+    )
     assert risk_class({}) is None
+
+
+def test_total_debt_includes_current_portion() -> None:
+    from app.analysis.metrics import total_debt
+
+    assert total_debt({"long_term_debt": 100, "current_debt": 50}) == 150
+    assert (
+        total_debt({"total_long_term_debt": 150, "long_term_debt": 100, "current_debt": 50}) == 150
+    )
+    assert total_debt({"long_term_debt": 100, "short_term_borrowings": 20}) == 120
+    assert total_debt({"current_debt": 50}) is None  # no long-term figure: unknown, not 50

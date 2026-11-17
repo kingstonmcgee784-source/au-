@@ -27,6 +27,10 @@ from typing import Any, Literal
 StatementType = Literal["income", "balance", "cashflow"]
 PeriodType = Literal["quarterly", "annual"]
 
+# Bump whenever parsing changes: statements stored by an older version are
+# downloaded and parsed again, even if the company has filed nothing new.
+PARSER_VERSION = 3
+
 ALLOWED_FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A", "10-KT", "10-KT/A"}
 
 
@@ -100,15 +104,20 @@ BALANCE_ITEMS: tuple[LineItem, ...] = (
     LineItem("total_assets", ("Assets",)),
     LineItem("current_liabilities", ("LiabilitiesCurrent",)),
     LineItem("total_liabilities", ("Liabilities",)),
+    # Debt is kept in parts, so the current portion is never lost:
+    # long_term_debt excludes amounts due within a year, current_debt is that
+    # portion, and total_long_term_debt is the reported total of both.
     LineItem(
         "long_term_debt",
         (
             "LongTermDebtNoncurrent",
-            "LongTermDebt",
             "LongTermDebtAndCapitalLeaseObligations",
             "LongTermNotesPayable",
         ),
     ),
+    LineItem("current_debt", ("LongTermDebtCurrent", "DebtCurrent")),
+    LineItem("total_long_term_debt", ("LongTermDebt",)),
+    LineItem("short_term_borrowings", ("ShortTermBorrowings", "CommercialPaper")),
     LineItem(
         "stockholders_equity",
         (
@@ -147,7 +156,8 @@ CASHFLOW_ITEMS: tuple[LineItem, ...] = (
         ("DepreciationDepletionAndAmortization", "DepreciationAndAmortization"),
     ),
     LineItem(
-        "share_based_compensation", ("ShareBasedCompensation", "AllocatedShareBasedCompensationExpense")
+        "share_based_compensation",
+        ("ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"),
     ),
     LineItem("share_repurchases", ("PaymentsForRepurchaseOfCommonStock",)),
     LineItem("dividends_paid", ("PaymentsOfDividends", "PaymentsOfDividendsCommonStock")),
@@ -191,7 +201,7 @@ def parse_company_facts(data: dict[str, Any]) -> list[ParsedStatement]:
         return []
 
     statements: list[ParsedStatement] = []
-    for period in periods.values():
+    for period in _relabel(periods).values():
         quarter = {"Q1": 1, "Q2": 2, "Q3": 3, "FY": 4}.get(period.fiscal_period)
         statements += _build(gaap, period, "quarterly", quarter)
         if period.fiscal_period == "FY":
@@ -342,6 +352,44 @@ def _reporting_periods(gaap: dict[str, Any]) -> dict[date, _Period]:
         if existing is None or filed < existing.filed:
             periods[end] = _Period(end, fiscal_year, fiscal_period, filed)
     return periods
+
+
+def _relabel(periods: dict[date, _Period]) -> dict[date, _Period]:
+    """Fiscal year and quarter labels worked out from the company's year ends.
+
+    The SEC's `fy` field is unreliable for companies whose fiscal year does
+    not end in December (NetApp's quarter ending July 2025 is tagged 2025,
+    though it is in fiscal 2026). Instead, each period is assigned to the
+    first fiscal year end on or after it, taken from the 10-K periods and
+    projected a year at a time past the latest one. The fiscal year is
+    labelled by the calendar year in which it ends; the quarter by how many
+    quarters before the year end the period closes. Without any 10-K
+    periods, the SEC labels are kept.
+    """
+    year_ends = sorted(p.end for p in periods.values() if p.fiscal_period == "FY")
+    if not year_ends:
+        return periods
+    out: dict[date, _Period] = {}
+    for end, period in periods.items():
+        if period.fiscal_period == "FY":
+            out[end] = _Period(end, end.year, "FY", period.filed)
+            continue
+        year_end = next((y for y in year_ends if y >= end), None)
+        if year_end is None:
+            year_end = year_ends[-1]
+            while year_end < end:
+                year_end = _plus_one_year(year_end)
+        quarters_before = round((year_end - end).days / 91.3)
+        quarter = min(max(4 - quarters_before, 1), 3)
+        out[end] = _Period(end, year_end.year, f"Q{quarter}", period.filed)
+    return out
+
+
+def _plus_one_year(day: date) -> date:
+    try:
+        return day.replace(year=day.year + 1)
+    except ValueError:  # 29 February
+        return day.replace(year=day.year + 1, day=28)
 
 
 def _days(fact: _Fact) -> int:

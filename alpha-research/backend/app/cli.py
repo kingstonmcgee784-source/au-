@@ -18,10 +18,10 @@ from app.db.migrations import upgrade_to_head
 from app.db.session import SessionLocal
 from app.providers.registry import get_fundamentals_client, get_market_data_provider
 from app.schemas.common import DataStatus, normalize_ticker
-from app.services.ingestion import sync_financials, sync_prices
-from app.services.catalysts import sync_events
-from app.services.insiders import sync_insiders
 from app.schemas.screener import ScanRequest
+from app.services.catalysts import sync_events
+from app.services.ingestion import sync_financials, sync_prices
+from app.services.insiders import sync_insiders
 from app.services.scoring_pipeline import score_stock
 from app.services.screener import create_scan, get_scan, process_scan
 

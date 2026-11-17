@@ -21,37 +21,51 @@ def sec_facts() -> dict[str, Any]:
 
     def filing(i: int, end: date) -> dict[str, Any]:
         fp, form = labels[i % 4]
-        return {"accn": f"a{i}", "fy": end.year, "fp": fp, "form": form,
-                "filed": (end + timedelta(days=30)).isoformat()}
+        return {
+            "accn": f"a{i}",
+            "fy": end.year,
+            "fp": fp,
+            "form": form,
+            "filed": (end + timedelta(days=30)).isoformat(),
+        }
 
     def quarter_rows(values: list[float]) -> list[dict[str, Any]]:
         rows = []
         for i, (end, value) in enumerate(zip(ends, values, strict=True)):
             start = (end - timedelta(days=89)).replace(day=1)
-            rows.append({"start": start.isoformat(), "end": end.isoformat(), "val": value,
-                         **filing(i, end)})
+            rows.append(
+                {"start": start.isoformat(), "end": end.isoformat(), "val": value, **filing(i, end)}
+            )
         return rows
 
     def instant(value: float) -> list[dict[str, Any]]:
-        return [{"end": end.isoformat(), "val": value, **filing(i, end)} for i, end in enumerate(ends)]
+        return [
+            {"end": end.isoformat(), "val": value, **filing(i, end)} for i, end in enumerate(ends)
+        ]
 
     revenue = [100, 110, 120, 130, 140, 150, 160, 170]
     usd = lambda rows: {"units": {"USD": rows}}  # noqa: E731
-    return {"facts": {"us-gaap": {
-        "Revenues": usd(quarter_rows(revenue)),
-        "GrossProfit": usd(quarter_rows([r * 0.6 for r in revenue])),
-        "OperatingIncomeLoss": usd(quarter_rows([r * 0.2 for r in revenue])),
-        "NetIncomeLoss": usd(quarter_rows([r * 0.15 for r in revenue])),
-        "NetCashProvidedByUsedInOperatingActivities": usd(quarter_rows([r * 0.25 for r in revenue])),
-        "PaymentsToAcquirePropertyPlantAndEquipment": usd(quarter_rows([5] * 8)),
-        "DepreciationDepletionAndAmortization": usd(quarter_rows([4] * 8)),
-        "CashAndCashEquivalentsAtCarryingValue": usd(instant(300)),
-        "LongTermDebtNoncurrent": usd(instant(100)),
-        "StockholdersEquity": usd(instant(800)),
-        "AssetsCurrent": usd(instant(500)),
-        "LiabilitiesCurrent": usd(instant(200)),
-        "CommonStockSharesOutstanding": {"units": {"shares": instant(100)}},
-    }}}
+    return {
+        "facts": {
+            "us-gaap": {
+                "Revenues": usd(quarter_rows(revenue)),
+                "GrossProfit": usd(quarter_rows([r * 0.6 for r in revenue])),
+                "OperatingIncomeLoss": usd(quarter_rows([r * 0.2 for r in revenue])),
+                "NetIncomeLoss": usd(quarter_rows([r * 0.15 for r in revenue])),
+                "NetCashProvidedByUsedInOperatingActivities": usd(
+                    quarter_rows([r * 0.25 for r in revenue])
+                ),
+                "PaymentsToAcquirePropertyPlantAndEquipment": usd(quarter_rows([5] * 8)),
+                "DepreciationDepletionAndAmortization": usd(quarter_rows([4] * 8)),
+                "CashAndCashEquivalentsAtCarryingValue": usd(instant(300)),
+                "LongTermDebtNoncurrent": usd(instant(100)),
+                "StockholdersEquity": usd(instant(800)),
+                "AssetsCurrent": usd(instant(500)),
+                "LiabilitiesCurrent": usd(instant(200)),
+                "CommonStockSharesOutstanding": {"units": {"shares": instant(100)}},
+            }
+        }
+    }
 
 
 class FakeSec:
@@ -75,10 +89,12 @@ class FakeSec:
 
 @pytest.fixture
 def providers() -> Iterator[FakeProvider]:
-    market = FakeProvider({
-        "TEST": bars(date(2025, 1, 1), 300, first_close=20.0),
-        "SPY": bars(date(2025, 1, 1), 300, first_close=500.0),
-    })
+    market = FakeProvider(
+        {
+            "TEST": bars(date(2025, 1, 1), 300, first_close=20.0),
+            "SPY": bars(date(2025, 1, 1), 300, first_close=500.0),
+        }
+    )
     app.dependency_overrides[market_data_provider] = lambda: market
     app.dependency_overrides[fundamentals_client] = lambda: FakeSec()
     yield market

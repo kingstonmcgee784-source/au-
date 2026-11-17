@@ -59,10 +59,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _provider_needs_key(self) -> "Settings":
-        key = self.market_data_api_key.get_secret_value().strip() if self.market_data_api_key else ""
+        key = (
+            self.market_data_api_key.get_secret_value().strip() if self.market_data_api_key else ""
+        )
         if self.market_data_provider != "none" and not key:
             raise ValueError(
-                f"MARKET_DATA_PROVIDER={self.market_data_provider} needs MARKET_DATA_API_KEY to be set"
+                f"MARKET_DATA_PROVIDER={self.market_data_provider} "
+                "needs MARKET_DATA_API_KEY to be set"
             )
         return self
 

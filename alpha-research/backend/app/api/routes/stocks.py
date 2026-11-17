@@ -82,17 +82,18 @@ def sync_prices(
     db: DbSession, provider: MarketData, settings: AppSettings, ticker: TickerPath
 ) -> DataResponse[PriceSyncResult]:
     """Fetch daily prices from the market data provider and store the new ones."""
-    return ingestion.sync_prices(
-        db, provider, ticker, history_years=settings.price_history_years
-    )
+    return ingestion.sync_prices(db, provider, ticker, history_years=settings.price_history_years)
 
 
 @router.post("/{ticker}/sync-financials", response_model=DataResponse[FinancialsSyncResult])
 def sync_financials(
     db: DbSession, source: Fundamentals, ticker: TickerPath
 ) -> DataResponse[FinancialsSyncResult]:
-    """Fetch reported financial statements from SEC EDGAR and store them."""
-    return ingestion.sync_financials(db, source, ticker)
+    """Fetch reported financial statements from SEC EDGAR and store them.
+
+    A manual load always downloads, even when no new 10-K or 10-Q was filed.
+    """
+    return ingestion.sync_financials(db, source, ticker, force=True)
 
 
 @router.post("/{ticker}/score", response_model=DataResponse[StockScoreOut])

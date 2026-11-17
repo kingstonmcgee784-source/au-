@@ -125,7 +125,9 @@ class TiingoProvider:
             ticker=ticker,
             price=price,
             change=change,
-            change_percent=(change / prev_close * 100) if change is not None and prev_close else None,
+            change_percent=(change / prev_close * 100)
+            if change is not None and prev_close
+            else None,
             previous_close=prev_close,
             volume=_int(row.get("volume")),
             timestamp=_datetime(row.get("timestamp")) or datetime.now(UTC),

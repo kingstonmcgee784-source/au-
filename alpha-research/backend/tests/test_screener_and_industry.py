@@ -105,8 +105,12 @@ def api_fakes(market: LimitedProvider) -> Iterator[LimitedProvider]:
 def run_scan(db: Session, market: LimitedProvider, tickers: list[str], sleep: Any = None) -> int:
     scan = create_scan(db, ScanRequest(tickers=tickers))
     process_scan(
-        scan.id, market=market, fundamentals=FakeSec(), history_years=2,
-        session_factory=SessionLocal, sleep=sleep or (lambda _s: None),
+        scan.id,
+        market=market,
+        fundamentals=FakeSec(),
+        history_years=2,
+        session_factory=SessionLocal,
+        sleep=sleep or (lambda _s: None),
     )
     return scan.id
 
@@ -153,7 +157,9 @@ def test_scan_waits_for_rate_limit_and_resumes(market: LimitedProvider, db: Sess
         sleeps.append(seconds)
         market.limited = False
         with SessionLocal() as session:
-            session.execute(update(ScreenRun).values(resume_at=datetime.now(UTC) - timedelta(seconds=1)))
+            session.execute(
+                update(ScreenRun).values(resume_at=datetime.now(UTC) - timedelta(seconds=1))
+            )
             session.commit()
 
     run_id = run_scan(db, market, ["AAA"], sleep=sleep)
@@ -173,7 +179,9 @@ def test_only_one_scan_at_a_time_and_cancel(client: TestClient, api_fakes: Limit
     assert cancelled["status"] in {"cancelled", "done"}
 
     assert client.post("/api/v1/screener/scans", json={"tickers": []}).status_code == 409
-    assert client.post("/api/v1/screener/scans", json={"tickers": ["bad ticker!"]}).status_code == 422
+    assert (
+        client.post("/api/v1/screener/scans", json={"tickers": ["bad ticker!"]}).status_code == 422
+    )
 
 
 def test_scan_from_watchlist(client: TestClient, db: Session, market: LimitedProvider) -> None:
@@ -184,7 +192,9 @@ def test_scan_from_watchlist(client: TestClient, db: Session, market: LimitedPro
     assert [i.ticker for i in scan.items] == ["AAA", "BBB"]
 
 
-def test_industry_needs_enough_peers(client: TestClient, market: LimitedProvider, db: Session) -> None:
+def test_industry_needs_enough_peers(
+    client: TestClient, market: LimitedProvider, db: Session
+) -> None:
     run_scan(db, market, ["AAA", "BBB"])
     body = client.get("/api/v1/stocks/AAA/industry").json()
     assert body["status"] == "unavailable"

@@ -12,7 +12,7 @@ from app.providers.base import FundamentalsSource, ProviderError
 from app.providers.sec_form4 import TRANSACTION_CODES, Form4ParseError, parse_form4
 from app.schemas.common import DataResponse, UnavailableReason, ok, unavailable
 from app.schemas.stocks import InsiderActivity, InsiderSyncResult, InsiderTransactionOut
-from app.services.stocks import LOCAL_SOURCE, find_stock, provider_failure
+from app.services.stocks import LOCAL_SOURCE, find_stock, get_or_create_stock, provider_failure
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,7 @@ def sync_insiders(
     except ProviderError as exc:
         return provider_failure(exc, ticker)
 
-    stock = find_stock(db, ticker)
-    if stock is None:
-        stock = Stock(ticker=ticker, name=company_name)
-        db.add(stock)
+    stock = get_or_create_stock(db, ticker, company_name)
     stock.sic_code = info.sic or stock.sic_code
     if info.sic_description and not stock.industry:
         stock.industry = info.sic_description.title()
@@ -56,7 +53,7 @@ def sync_insiders(
     pending = [f for f in candidates if f.accession not in known]
     batch = pending[:MAX_FILINGS_PER_SYNC]
 
-    added_filings = added_trades = unreadable = 0
+    added_filings = added_trades = unreadable = other_issuer = 0
     retrieved_at = datetime.now(UTC)
     for filing in batch:
         try:
@@ -67,6 +64,11 @@ def sync_insiders(
         try:
             form = parse_form4(document)
             owner_name, owner_role, trades = form.owner_name, form.owner_role, form.trades
+            if form.issuer_cik is not None and form.issuer_cik != cik:
+                # Listed because this company is the reporting owner of another
+                # company's shares: not an insider trade in this stock.
+                owner_name, owner_role, trades = form.owner_name, "Owner of another company", []
+                other_issuer += 1
         except Form4ParseError as exc:
             logger.warning("Skipping unreadable Form 4 %s: %s", filing.accession, exc)
             owner_name, owner_role, trades = "Unreadable filing", "Unknown", []
@@ -109,6 +111,7 @@ def sync_insiders(
             transactions_added=added_trades,
             filings_remaining=len(pending) - len(batch),
             unreadable_filings=unreadable,
+            other_issuer_filings=other_issuer,
         ),
         source=source.name,
         as_of=retrieved_at,

@@ -26,8 +26,12 @@ class FakeProvider:
     def get_profile(self, ticker: str) -> StockSummary:
         self._check(ticker)
         return StockSummary(
-            ticker=ticker, name=f"{ticker} Test Co", exchange="NASDAQ",
-            sector=None, industry=None, currency="USD",
+            ticker=ticker,
+            name=f"{ticker} Test Co",
+            exchange="NASDAQ",
+            sector=None,
+            industry=None,
+            currency="USD",
         )
 
     def get_quote(self, ticker: str) -> Quote:
@@ -35,8 +39,14 @@ class FakeProvider:
         bars = self.known[ticker]
         last = bars[-1].close if bars else 1.0
         return Quote(
-            ticker=ticker, price=last, change=None, change_percent=None, previous_close=None,
-            volume=None, timestamp=datetime(2026, 11, 16, tzinfo=UTC), feed="fake feed",
+            ticker=ticker,
+            price=last,
+            change=None,
+            change_percent=None,
+            previous_close=None,
+            volume=None,
+            timestamp=datetime(2026, 11, 16, tzinfo=UTC),
+            feed="fake feed",
         )
 
     def get_daily_prices(self, ticker: str, start: date, end: date | None = None) -> list[PriceBar]:
@@ -45,11 +55,19 @@ class FakeProvider:
         return [b for b in self.known[ticker] if b.date >= start and (end is None or b.date <= end)]
 
 
-def bars(start: date, count: int, first_close: float = 100.0) -> list[PriceBar]:
+def bars(
+    start: date, count: int, first_close: float = 100.0, adjust: float = 1.0
+) -> list[PriceBar]:
+    """Rising daily bars. `adjust` scales adjusted closes, e.g. 0.5 after a 2-for-1 split."""
     return [
         PriceBar(
-            date=start + timedelta(days=i), open=first_close + i, high=first_close + i,
-            low=first_close + i, close=first_close + i, adjusted_close=None, volume=1000,
+            date=start + timedelta(days=i),
+            open=first_close + i,
+            high=first_close + i,
+            low=first_close + i,
+            close=first_close + i,
+            adjusted_close=(first_close + i) * adjust,
+            volume=1000,
         )
         for i in range(count)
     ]

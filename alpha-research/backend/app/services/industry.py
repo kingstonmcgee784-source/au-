@@ -23,11 +23,13 @@ def latest_metrics_by_stock(db: Session) -> dict[int, Metrics]:
         .subquery()
     )
     rows = db.execute(
-        select(FinancialMetric.stock_id, FinancialMetric.metric, FinancialMetric.value).join(
+        select(FinancialMetric.stock_id, FinancialMetric.metric, FinancialMetric.value)
+        .join(
             newest,
             (FinancialMetric.stock_id == newest.c.stock_id)
             & (FinancialMetric.as_of == newest.c.as_of),
-        ).where(FinancialMetric.source == METRICS_SOURCE)
+        )
+        .where(FinancialMetric.source == METRICS_SOURCE)
     ).all()
     out: dict[int, Metrics] = {}
     for stock_id, metric, value in rows:
@@ -46,9 +48,7 @@ def industry_metrics(
     stocks = {s.id: s for s in db.scalars(select(Stock).where(Stock.sic_code.is_not(None)))}
     peer_metrics = latest_metrics_by_stock(db)
     candidates = {
-        s.ticker: s.sic_code
-        for sid, s in stocks.items()
-        if sid != stock.id and sid in peer_metrics
+        s.ticker: s.sic_code for sid, s in stocks.items() if sid != stock.id and sid in peer_metrics
     }
     group = choose_group(stock.sic_code, candidates)
     if group is None:
@@ -78,7 +78,9 @@ def comparison(db: Session, ticker: str) -> DataResponse[IndustryComparison]:
     _, prefix, peers = industry_metrics(db, stock, own)
     if prefix is None:
         same = db.scalar(
-            select(func.count(Stock.id)).where(Stock.sic_code == stock.sic_code, Stock.id != stock.id)
+            select(func.count(Stock.id)).where(
+                Stock.sic_code == stock.sic_code, Stock.id != stock.id
+            )
         )
         return unavailable(
             UnavailableReason.INSUFFICIENT_HISTORY,

@@ -55,7 +55,7 @@ def compute_metrics(
         latest_balance.get("cash_and_equivalents"), latest_balance.get("short_term_investments")
     )
     # Unknown debt is not assumed to be zero: debt-based metrics stay empty.
-    debt = latest_balance.get("long_term_debt")
+    debt = total_debt(latest_balance)
     enterprise_value = (
         market_cap + debt - (cash or 0.0) if market_cap is not None and debt is not None else None
     )
@@ -72,7 +72,9 @@ def compute_metrics(
     operating_cf = _ttm(cashflow, "operating_cash_flow")
     capex = _ttm(cashflow, "capital_expenditures")
     sbc = _ttm(cashflow, "share_based_compensation")
-    free_cash_flow = operating_cf - capex if operating_cf is not None and capex is not None else None
+    free_cash_flow = (
+        operating_cf - capex if operating_cf is not None and capex is not None else None
+    )
     ebitda = (
         operating_income + d_and_a if operating_income is not None and d_and_a is not None else None
     )
@@ -95,7 +97,9 @@ def compute_metrics(
     m["operating_margin"] = _ratio(operating_income, revenue, positive_denominator=True)
     m["net_margin"] = _ratio(net_income, revenue, positive_denominator=True)
     m["fcf_margin"] = _ratio(free_cash_flow, revenue, positive_denominator=True)
-    m["roe"] = _ratio(net_income, latest_balance.get("stockholders_equity"), positive_denominator=True)
+    m["roe"] = _ratio(
+        net_income, latest_balance.get("stockholders_equity"), positive_denominator=True
+    )
     m["sbc_to_revenue"] = _ratio(sbc, revenue, positive_denominator=True)
 
     # -- Balance sheet --------------------------------------------------------
@@ -149,8 +153,28 @@ def price_metrics(prices: Sequence[PricePoint], benchmark: Sequence[PricePoint] 
     window = closes[-TRADING_DAYS:]
     m["volatility_1y"] = _annualized_volatility(window) if len(window) >= 60 else None
     m["max_drawdown_1y"] = _max_drawdown(window) if len(window) >= 60 else None
-    m["from_52w_high"] = (last / max(window) - 1) if last is not None and len(window) >= 200 else None
+    m["from_52w_high"] = (
+        (last / max(window) - 1) if last is not None and len(window) >= 200 else None
+    )
     return m
+
+
+def total_debt(balance: dict[str, float | None]) -> float | None:
+    """All interest-bearing debt, including amounts due within a year.
+
+    Uses the reported long-term total when there is one, otherwise the
+    non-current and current parts; short-term borrowings are added either
+    way. None when no long-term debt figure is reported at all.
+    """
+    reported_total = balance.get("total_long_term_debt")
+    noncurrent = balance.get("long_term_debt")
+    if reported_total is not None:
+        long_term = reported_total
+    elif noncurrent is not None:
+        long_term = noncurrent + (balance.get("current_debt") or 0.0)
+    else:
+        return None
+    return long_term + (balance.get("short_term_borrowings") or 0.0)
 
 
 # -- helpers -------------------------------------------------------------------

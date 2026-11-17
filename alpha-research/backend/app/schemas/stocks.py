@@ -134,6 +134,8 @@ class InsiderSyncResult(BaseModel):
     transactions_added: int
     filings_remaining: int
     unreadable_filings: int
+    # Form 4s where this company reported trades in another company's shares.
+    other_issuer_filings: int = 0
 
 
 class InsiderTransactionOut(BaseModel):

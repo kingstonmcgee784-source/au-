@@ -58,6 +58,7 @@ class InsiderTrade:
 
 @dataclass(frozen=True)
 class Form4:
+    issuer_cik: int | None  # the company whose shares were traded
     owner_name: str
     owner_role: str
     trades: list[InsiderTrade]
@@ -85,7 +86,9 @@ def parse_form4(xml_text: str) -> Form4:
         when = _date(_value(row, "transactionDate"))
         code = (row.findtext("transactionCoding/transactionCode") or "").strip().upper()
         shares = _number(_value(row, "transactionAmounts/transactionShares"))
-        direction = (_value(row, "transactionAmounts/transactionAcquiredDisposedCode") or "").upper()
+        direction = (
+            _value(row, "transactionAmounts/transactionAcquiredDisposedCode") or ""
+        ).upper()
         if when is None or not code or shares is None or direction not in {"A", "D"}:
             continue
 
@@ -116,7 +119,13 @@ def parse_form4(xml_text: str) -> Form4:
                 security=(_value(row, "securityTitle") or "").strip(),
             )
         )
-    return Form4(owner_name=owner_name, owner_role=owner_role, trades=trades)
+    issuer = (root.findtext("issuer/issuerCik") or "").strip()
+    return Form4(
+        issuer_cik=int(issuer) if issuer.isdigit() else None,
+        owner_name=owner_name,
+        owner_role=owner_role,
+        trades=trades,
+    )
 
 
 def _owners(root: ET.Element) -> tuple[str, str]:

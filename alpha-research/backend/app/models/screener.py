@@ -29,7 +29,9 @@ class ScreenRunItem(Base):
     __tablename__ = "screen_run_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("screen_runs.id", ondelete="CASCADE"), index=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("screen_runs.id", ondelete="CASCADE"), index=True
+    )
     position: Mapped[int] = mapped_column(Integer)
     ticker: Mapped[str] = mapped_column(String(16))
     # pending | scored | not_scored | failed

@@ -33,12 +33,32 @@ def test_sends_token_header_and_parses_prices() -> None:
             "/tiingo/daily/msft/prices": httpx.Response(
                 200,
                 json=[
-                    {"date": "2026-11-13T00:00:00.000Z", "open": 2, "high": 3, "low": 1,
-                     "close": 2.5, "volume": 100, "adjClose": 2.4},
-                    {"date": "2026-11-12T00:00:00.000Z", "open": 1, "high": 2, "low": 0.5,
-                     "close": 1.5, "volume": 90, "adjClose": 1.4},
-                    {"date": "2026-11-11T00:00:00.000Z", "open": None, "high": 2, "low": 1,
-                     "close": 1, "volume": 1},
+                    {
+                        "date": "2026-11-13T00:00:00.000Z",
+                        "open": 2,
+                        "high": 3,
+                        "low": 1,
+                        "close": 2.5,
+                        "volume": 100,
+                        "adjClose": 2.4,
+                    },
+                    {
+                        "date": "2026-11-12T00:00:00.000Z",
+                        "open": 1,
+                        "high": 2,
+                        "low": 0.5,
+                        "close": 1.5,
+                        "volume": 90,
+                        "adjClose": 1.4,
+                    },
+                    {
+                        "date": "2026-11-11T00:00:00.000Z",
+                        "open": None,
+                        "high": 2,
+                        "low": 1,
+                        "close": 1,
+                        "volume": 1,
+                    },
                 ],
             )
         },
@@ -59,8 +79,16 @@ def test_quote_uses_reference_price_and_previous_close() -> None:
         {
             "/iex/livn": httpx.Response(
                 200,
-                json=[{"ticker": "LIVN", "tngoLast": 110.0, "last": None, "prevClose": 100.0,
-                       "volume": 5000, "timestamp": "2026-11-16T20:00:00+00:00"}],
+                json=[
+                    {
+                        "ticker": "LIVN",
+                        "tngoLast": 110.0,
+                        "last": None,
+                        "prevClose": 100.0,
+                        "volume": 5000,
+                        "timestamp": "2026-11-16T20:00:00+00:00",
+                    }
+                ],
             )
         }
     )
@@ -109,7 +137,11 @@ def test_http_errors_map_to_provider_errors(status: int, error: type[Exception])
 
 def test_not_found_detail_in_success_body() -> None:
     provider = provider_with(
-        {"/tiingo/daily/zzzz": httpx.Response(200, json={"detail": "Error: Ticker 'ZZZZ' not found"})}
+        {
+            "/tiingo/daily/zzzz": httpx.Response(
+                200, json={"detail": "Error: Ticker 'ZZZZ' not found"}
+            )
+        }
     )
     with pytest.raises(TickerNotFoundError):
         provider.get_profile("ZZZZ")
@@ -130,8 +162,13 @@ def test_search_skips_inactive_and_foreign_listings() -> None:
             "/tiingo/utilities/search": httpx.Response(
                 200,
                 json=[
-                    {"ticker": "AAPL", "name": "Apple Inc", "assetType": "Stock", "isActive": True,
-                     "countryCode": "US"},
+                    {
+                        "ticker": "AAPL",
+                        "name": "Apple Inc",
+                        "assetType": "Stock",
+                        "isActive": True,
+                        "countryCode": "US",
+                    },
                     {"ticker": "OLD", "name": "Old Co", "isActive": False, "countryCode": "US"},
                     {"ticker": "APC", "name": "Apple (DE)", "isActive": True, "countryCode": "DE"},
                 ],
@@ -142,8 +179,12 @@ def test_search_skips_inactive_and_foreign_listings() -> None:
 
 
 def test_rate_limit_serves_cached_quote() -> None:
-    responses = iter([httpx.Response(200, json=[{"tngoLast": 5.0, "prevClose": 4.0}]),
-                      httpx.Response(429, json={})])
+    responses = iter(
+        [
+            httpx.Response(200, json=[{"tngoLast": 5.0, "prevClose": 4.0}]),
+            httpx.Response(429, json={}),
+        ]
+    )
     provider = TiingoProvider(
         "k",
         quote_cache_seconds=0,  # always try the network

@@ -18,3 +18,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+# The local alembic/ folder holds migrations; the import is the alembic package.
+known-third-party = ["alembic"]

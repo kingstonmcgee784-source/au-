@@ -47,9 +47,7 @@ def get_report(db: DbSession, report_id: int) -> ResearchReportOut:
     return research.get_report(db, report_id)
 
 
-@router.post(
-    "/reports/generate", response_model=DataResponse[ResearchReportOut], tags=["reports"]
-)
+@router.post("/reports/generate", response_model=DataResponse[ResearchReportOut], tags=["reports"])
 def generate_report(
     writer: Writer, payload: GenerateReportRequest
 ) -> DataResponse[ResearchReportOut]:

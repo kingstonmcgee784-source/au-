@@ -232,7 +232,9 @@ class ScanRunner:
                 if run is not None and run.status in ACTIVE:
                     run.status = "done"
                     run.finished_at = datetime.now(UTC)
-                    run.message = "The scan stopped because of an unexpected error; see the API log."
+                    run.message = (
+                        "The scan stopped because of an unexpected error; see the API log."
+                    )
                     db.commit()
 
 

@@ -184,7 +184,7 @@ export function PerformanceView() {
                                 onClick={() => void remove(call)}
                                 className="rounded p-1 text-ink-faint hover:text-negative"
                                 aria-label={`Remove the ${call.ticker} call`}
-                                title="Calls can be removed only on the day they were recorded"
+                                title="Calls can be removed only within 24 hours of being recorded"
                               >
                                 <Trash2 className="size-4" />
                               </button>
@@ -200,7 +200,7 @@ export function PerformanceView() {
                 Returns use adjusted closing prices, so dividends are included. A call is measured
                 from the closing price on the day it was recorded. Each period is measured at the
                 first trading day after it ends; until then it shows as pending. Calls cannot be
-                edited, and can be removed only on the day they were recorded. Past results do not
+                edited, and can be removed only within 24 hours of being recorded. Past results do not
                 predict future returns.
                 {state.data.benchmarks_missing.length > 0 &&
                   ` Benchmark prices missing for ${state.data.benchmarks_missing.join(", ")}: use Update prices.`}
