@@ -61,6 +61,8 @@ class FundamentalsSource(Protocol):
 
     def filing_document(self, cik: int, filing: "FilingRef") -> str: ...
 
+    def filing_url(self, cik: int, filing: "FilingRef") -> str: ...
+
 
 class MarketDataProvider(Protocol):
     name: str

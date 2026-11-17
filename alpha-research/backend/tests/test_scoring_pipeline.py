@@ -69,6 +69,9 @@ class FakeSec:
     def filing_document(self, cik: int, filing: FilingRef) -> str:
         raise AssertionError("no filings to download")
 
+    def filing_url(self, cik: int, filing: FilingRef) -> str:
+        return f"https://example.test/{filing.accession}"
+
 
 @pytest.fixture
 def providers() -> Iterator[FakeProvider]:
@@ -87,12 +90,12 @@ def test_calculate_score_end_to_end(client: TestClient, providers: FakeProvider)
     assert body["status"] == "ok", body
     score = body["data"]
 
-    # Catalysts and industry have no data source yet: 85% coverage.
-    assert score["coverage"] == pytest.approx(0.85)
+    # Only industry positioning has no data source yet: 95% coverage.
+    assert score["coverage"] == pytest.approx(0.95)
     categories = {c["key"]: c for c in score["categories"]}
-    for key in ("catalysts", "industry"):
-        assert categories[key]["points"] is None
-        assert categories[key]["unrated_reason"]
+    assert categories["industry"]["points"] is None
+    assert categories["industry"]["unrated_reason"]
+    assert categories["catalysts"]["points"] is not None
     # Insider filings were loaded (none in the window): rated, neutral to positive.
     assert categories["institutional"]["points"] is not None
     assert "Form 4" in score["notes"]
@@ -108,7 +111,7 @@ def test_calculate_score_end_to_end(client: TestClient, providers: FakeProvider)
     assert latest["data"]["total_score"] == score["total_score"]
     ranked = client.get("/api/v1/rankings").json()
     assert [r["ticker"] for r in ranked["data"]] == ["TEST"]
-    assert ranked["data"][0]["coverage"] == pytest.approx(0.85)
+    assert ranked["data"][0]["coverage"] == pytest.approx(0.95)
 
     metrics = client.get("/api/v1/stocks/TEST/metrics").json()
     assert metrics["status"] == "ok"

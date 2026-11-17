@@ -7,6 +7,8 @@
  */
 
 import type {
+  CatalystFeed,
+  EventsSyncResult,
   DataResponse,
   FinancialStatement,
   FinancialsSyncResult,
@@ -137,6 +139,14 @@ export const api = {
 
   insiders: (symbol: string, days = 180) =>
     request<DataResponse<InsiderActivity>>(`/stocks/${ticker(symbol)}/insiders?days=${days}`),
+
+  syncEvents: (symbol: string) =>
+    request<DataResponse<EventsSyncResult>>(`/stocks/${ticker(symbol)}/sync-events`, {
+      method: "POST",
+    }),
+
+  catalysts: (symbol: string) =>
+    request<DataResponse<CatalystFeed>>(`/stocks/${ticker(symbol)}/catalysts`),
 
   rankings: (limit = 10) => request<DataResponse<RankingEntry[]>>(`/rankings?limit=${limit}`),
 

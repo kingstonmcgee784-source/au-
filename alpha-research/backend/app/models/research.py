@@ -37,8 +37,11 @@ class NewsArticle(SourcedMixin, Base):
     publisher: Mapped[str | None] = mapped_column(String(128))
     published_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
     summary: Mapped[str | None] = mapped_column(Text)
-    # earnings | contract | regulatory | analyst | other
+    # Kind of the headline item, e.g. earnings, agreement, red_flag.
     category: Mapped[str | None] = mapped_column(String(32))
+    # For SEC filings: the form (8-K, 8-K/A) and its item numbers.
+    form: Mapped[str | None] = mapped_column(String(16))
+    items: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
 
 
 class Recommendation(TimestampMixin, Base):

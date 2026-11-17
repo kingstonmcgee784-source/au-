@@ -27,7 +27,7 @@ export function CalculateScoreButton({
       run={() => api.calculateScore(ticker)}
       describe={(s) =>
         `Scored ${formatNumber(s.total_score, 0)}/100 using ${Math.round(s.coverage * 100)}% of ` +
-        "the methodology. Prices, SEC statements and insider filings were refreshed first."
+        "the methodology. Prices, SEC statements, insider filings and 8-K events were refreshed first."
       }
       onSynced={onScored}
     />

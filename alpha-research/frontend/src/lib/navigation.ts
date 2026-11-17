@@ -90,8 +90,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/news",
     label: "News & Catalysts",
     icon: Newspaper,
-    stage: "planned",
-    description: "Company news, earnings dates and catalyst tracking.",
+    stage: "built",
+    requires: ["fundamentals"],
+    description: "Company events from SEC 8-K filings and the estimated next earnings date.",
   },
   {
     href: "/watchlist",

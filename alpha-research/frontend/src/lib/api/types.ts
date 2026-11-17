@@ -241,3 +241,33 @@ export interface InsiderActivity {
   summary: Record<string, number | null>;
   transactions: InsiderTransaction[];
 }
+
+export interface EventsSyncResult {
+  ticker: string;
+  events_added: number;
+  events_stored: number;
+}
+
+export interface EventItem {
+  code: string;
+  label: string;
+  kind: string;
+}
+
+export interface CatalystEvent {
+  filed_on: string;
+  form: string;
+  headline: string;
+  kind: string;
+  items: EventItem[];
+  url: string;
+}
+
+export interface CatalystFeed {
+  ticker: string;
+  synced_at: string;
+  /** Estimated from the timing of past earnings releases, not announced. */
+  next_earnings_estimate: string | null;
+  days_to_next_earnings: number | null;
+  events: CatalystEvent[];
+}

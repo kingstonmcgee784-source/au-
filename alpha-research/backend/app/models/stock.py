@@ -23,6 +23,8 @@ class Stock(TimestampMixin, Base):
     # When Form 4 filings were last loaded; None means never, which is
     # different from "loaded, and there were no insider trades".
     insiders_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # When 8-K events were last loaded (None = never).
+    events_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     prices: Mapped[list["HistoricalPrice"]] = relationship(
         back_populates="stock", cascade="all, delete-orphan"

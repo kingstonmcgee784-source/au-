@@ -1,6 +1,7 @@
 "use client";
 
 import { Building2, LineChart } from "lucide-react";
+import Link from "next/link";
 
 import { DataView, SourceNote } from "@/components/ui/data-view";
 import { EmptyState } from "@/components/ui/states";
@@ -44,7 +45,15 @@ function TickerResearch({ ticker }: { ticker: string }) {
   };
   return (
     <div className="space-y-4">
-      <CalculateScoreButton ticker={ticker} onScored={reloadAll} />
+      <div className="flex flex-wrap items-start gap-4">
+        <CalculateScoreButton ticker={ticker} onScored={reloadAll} />
+        <Link
+          href={`/news?ticker=${ticker}`}
+          className="inline-flex h-9 items-center rounded-md px-3 text-sm text-ink-muted hover:text-accent"
+        >
+          Events and earnings date →
+        </Link>
+      </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <ProfilePanel ticker={ticker} />
         <QuotePanel ticker={ticker} />

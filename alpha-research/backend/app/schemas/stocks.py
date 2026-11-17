@@ -157,3 +157,33 @@ class InsiderActivity(BaseModel):
     synced_at: datetime
     summary: dict[str, float | None]
     transactions: list[InsiderTransactionOut]
+
+
+class EventsSyncResult(BaseModel):
+    ticker: str
+    events_added: int
+    events_stored: int
+
+
+class EventItem(BaseModel):
+    code: str
+    label: str
+    kind: str
+
+
+class CatalystEvent(BaseModel):
+    filed_on: date
+    form: str
+    headline: str
+    kind: str
+    items: list[EventItem]
+    url: str
+
+
+class CatalystFeed(BaseModel):
+    ticker: str
+    synced_at: datetime
+    # Estimated from the timing of past earnings releases, not announced.
+    next_earnings_estimate: date | None
+    days_to_next_earnings: int | None
+    events: list[CatalystEvent]

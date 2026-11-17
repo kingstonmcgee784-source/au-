@@ -7,6 +7,8 @@ from fastapi import APIRouter, Query
 from app.api.deps import AppSettings, DbSession, Fundamentals, MarketData, TickerPath
 from app.schemas.common import DataResponse
 from app.schemas.stocks import (
+    CatalystFeed,
+    EventsSyncResult,
     FinancialsSyncResult,
     FinancialStatementOut,
     InsiderActivity,
@@ -19,6 +21,7 @@ from app.schemas.stocks import (
     TechnicalSnapshot,
 )
 from app.services import (
+    catalysts,
     financials,
     ingestion,
     insiders,
@@ -130,3 +133,17 @@ def insider_activity(
 ) -> DataResponse[InsiderActivity]:
     """Stored insider transactions and a summary for the last `days` days."""
     return insiders.get_activity(db, ticker, days)
+
+
+@router.post("/{ticker}/sync-events", response_model=DataResponse[EventsSyncResult])
+def sync_events(
+    db: DbSession, source: Fundamentals, ticker: TickerPath
+) -> DataResponse[EventsSyncResult]:
+    """Load the last ~13 months of 8-K filings from the SEC filing index."""
+    return catalysts.sync_events(db, source, ticker)
+
+
+@router.get("/{ticker}/catalysts", response_model=DataResponse[CatalystFeed])
+def catalyst_feed(db: DbSession, ticker: TickerPath) -> DataResponse[CatalystFeed]:
+    """Stored 8-K events, newest first, with an estimated next earnings date."""
+    return catalysts.get_catalysts(db, ticker)

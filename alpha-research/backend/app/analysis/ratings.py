@@ -108,13 +108,29 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
             ),
         ),
     ),
+    # From SEC 8-K event types only (see app.analysis.catalysts): reliable red
+    # flags count against, material agreements and acquisitions count for,
+    # and an earnings release expected within 90 days is a near-term catalyst.
+    "catalysts": (
+        2,
+        (
+            SubRating("catalyst_red_flags_365d", ((0, 0.8), (1, 0.3), (2, 0.0)), "Red-flag filings (12 months)"),
+            SubRating(
+                "catalyst_material_events_180d",
+                ((0, 0.5), (1, 0.7), (3, 0.9)),
+                "Material agreements and acquisitions (6 months)",
+            ),
+            SubRating(
+                "catalyst_earnings_within_90d", ((0, 0.4), (1, 0.7)), "Earnings release expected within 90 days"
+            ),
+        ),
+    ),
     # No data source yet: always unrated.
-    "catalysts": (1, ()),
     "industry": (1, ()),
 }
 
 UNRATED_REASON = {
-    "catalysts": "No news or event data source is connected.",
+    "catalysts": "SEC 8-K events have not been loaded for this stock.",
     "institutional": "Insider (Form 4) filings have not been loaded, and no 13F data is connected.",
     "industry": "No industry classification or peer data is connected.",
 }

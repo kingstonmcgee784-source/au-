@@ -168,6 +168,32 @@ cd alpha-research/backend && .venv/bin/python -m app.cli sync-insiders PLTR LIVN
 - **Limit per load:** at most 60 filings are read at a time. Click again to
   load older ones.
 
+## Catalysts (SEC 8-K events)
+
+**News & Catalysts** lists a stock's 8-K filings from the last 13 months, with a
+link to each one, and an estimated next earnings date. Use **Load SEC events**;
+**Calculate score** loads them too. It costs one SEC request, with no document
+downloads. From the command line:
+
+```bash
+cd alpha-research/backend && .venv/bin/python -m app.cli sync-events PLTR LIVN
+```
+
+- **Classification:** each 8-K is labelled from the item numbers it reports,
+  for example 2.02 = earnings release, 1.01 = material agreement, 5.02 =
+  executive change. That shows the type of event, not whether it was good or
+  bad.
+- **What counts against the score:** only reliable red flags, which are
+  bankruptcy (1.03), impairments (2.06), restated financials (4.02) and
+  auditor changes (4.01). Ambiguous items are marked "Read filing". For
+  example, 3.01 covers both delisting notices and voluntary exchange
+  transfers.
+- **Next earnings date:** estimated from when the company reported a year
+  earlier, and always labelled as an estimate.
+- **Effect on scoring:** catalysts fill the "Upcoming catalysts" category, so
+  scores now cover **95%** of the methodology. Only industry positioning is
+  missing.
+
 ## Scoring
 
 On **Stock Analysis**, **Calculate score** refreshes the stock's prices and SEC
@@ -194,10 +220,11 @@ Rules that keep the score honest:
 - **Missing data is not zero.** A metric whose inputs are missing, or that is
   not meaningful (for example P/E with negative earnings), is left empty.
   Debt that a company does not report is not assumed to be zero.
-- **Unscored categories.** Catalysts and industry positioning have no data
-  source yet, so they are not scored. Institutional and insider activity uses
-  Form 4 insider trades only. The total is the share of points earned in the
-  categories that were rated, shown with its **coverage** (normally 85%).
+- **Unscored category.** Industry positioning has no data source yet, so it is
+  not scored. Institutional and insider activity uses Form 4 insider trades
+  only, and catalysts use 8-K event types. The total is the share of points
+  earned in the categories that were rated, shown with its **coverage**
+  (normally 95%).
 - **Core categories are required.** A stock is not scored unless
   fundamentals, valuation, technicals and growth can all be rated.
   Otherwise the app says what data is missing.
@@ -243,7 +270,8 @@ cd alpha-research/frontend && npm run lint && npm run build
 | Daily price history | Loaded from Tiingo into SQLite on request; incremental after the first load |
 | Financial statements (income, balance sheet, cash flow; quarterly and annual) | Loaded from SEC EDGAR into SQLite on request |
 | AI report generation | Reports `ai_not_configured` |
-| Screener, News & Catalysts, Backtesting, Performance Tracking | Pages describe the planned feature; not built |
+| News & Catalysts (8-K events, estimated earnings date) | Loaded from the SEC filing index on request |
+| Screener, Backtesting, Performance Tracking | Pages describe the planned feature; not built |
 
 See [docs/API.md](docs/API.md) for every endpoint and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design decisions.

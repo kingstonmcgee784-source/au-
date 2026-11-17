@@ -38,6 +38,8 @@ class FilingRef:
     form: str
     filed: date
     primary_document: str
+    # 8-K item numbers, e.g. "2.02,9.01"; empty for other forms.
+    items: str = ""
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,10 @@ class CompanyInfo:
     sic: str | None
     sic_description: str | None
     filings: list[FilingRef]
+    exchanges: tuple[str, ...] = ()
+
+
+INFO_CACHE_SECONDS = 600
 
 
 class SecEdgarClient:
@@ -69,6 +75,7 @@ class SecEdgarClient:
         self._tickers_loaded_at = 0.0
         self._throttle = threading.Lock()
         self._last_request = 0.0
+        self._info_cache: dict[int, tuple[float, CompanyInfo]] = {}
 
     def lookup(self, ticker: str) -> tuple[int, str]:
         """Return (CIK, company name) for a ticker."""
@@ -90,26 +97,49 @@ class SecEdgarClient:
         return data
 
     def company_info(self, cik: int) -> CompanyInfo:
-        """Industry code and the most recent filings (newest first)."""
+        """Industry code, exchanges and the most recent filings (newest first).
+
+        Cached briefly, because one scoring run reads it for both insider
+        filings and 8-K events.
+        """
+        cached = self._info_cache.get(cik)
+        if cached and time.monotonic() - cached[0] < INFO_CACHE_SECONDS:
+            return cached[1]
         data = self._get_json(SUBMISSIONS_URL.format(cik=cik))
         recent = data.get("filings", {}).get("recent", {}) if isinstance(data, dict) else {}
         filings: list[FilingRef] = []
+        accessions = recent.get("accessionNumber", [])
+        items = recent.get("items") or [""] * len(accessions)
         columns = zip(
-            recent.get("accessionNumber", []),
+            accessions,
             recent.get("form", []),
             recent.get("filingDate", []),
             recent.get("primaryDocument", []),
+            items,
             strict=False,
         )
-        for accession, form, filed, document in columns:
+        for accession, form, filed, document, item_list in columns:
             try:
-                filings.append(FilingRef(accession, form, date.fromisoformat(filed), document))
+                filings.append(
+                    FilingRef(accession, form, date.fromisoformat(filed), document, item_list or "")
+                )
             except (TypeError, ValueError):
                 continue
-        return CompanyInfo(
+        info = CompanyInfo(
             sic=str(data.get("sic") or "") or None,
             sic_description=data.get("sicDescription") or None,
             filings=filings,
+            exchanges=tuple(str(e) for e in data.get("exchanges") or [] if e),
+        )
+        self._info_cache[cik] = (time.monotonic(), info)
+        return info
+
+    def filing_url(self, cik: int, filing: FilingRef) -> str:
+        """Public link to a filing's primary document."""
+        return ARCHIVE_URL.format(
+            cik=cik,
+            accession=filing.accession.replace("-", ""),
+            document=filing.primary_document.rsplit("/", 1)[-1],
         )
 
     def filing_document(self, cik: int, filing: FilingRef) -> str:
@@ -118,11 +148,7 @@ class SecEdgarClient:
         Ownership forms are listed with a stylesheet folder in front
         (xslF345X05/form4.xml); the raw XML is the file without that folder.
         """
-        document = filing.primary_document.rsplit("/", 1)[-1]
-        url = ARCHIVE_URL.format(
-            cik=cik, accession=filing.accession.replace("-", ""), document=document
-        )
-        return self._get(url).text
+        return self._get(self.filing_url(cik, filing)).text
 
     def _load_tickers(self) -> dict[str, tuple[int, str]]:
         data = self._get_json(TICKERS_URL)
