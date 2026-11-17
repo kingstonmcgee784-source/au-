@@ -111,13 +111,15 @@ export function PerformanceView() {
             <Panel title="Tracked calls" icon={ListChecks}>
               {deleteError && <p className="mb-3 text-sm text-negative">{deleteError}</p>}
               <div className="-mx-4 overflow-x-auto">
-                <table className="w-full min-w-[980px] text-sm">
+                <table className="w-full min-w-[1180px] text-sm">
                   <thead>
                     <tr className="border-b border-line text-right text-[11px] uppercase tracking-wider text-ink-faint">
                       <th className="px-4 py-2 text-left font-medium">Stock</th>
                       <th className="px-4 py-2 text-left font-medium">Called on</th>
                       <th className="px-4 py-2 font-medium">Score</th>
                       <th className="px-4 py-2 font-medium">Price then</th>
+                      <th className="px-4 py-2 font-medium">Stop / target</th>
+                      <th className="px-4 py-2 text-left font-medium">Plan</th>
                       <th className="px-4 py-2 font-medium">Price now</th>
                       <th className="px-4 py-2 font-medium">Return</th>
                       <th className="px-4 py-2 font-medium">vs S&amp;P</th>
@@ -161,7 +163,29 @@ export function PerformanceView() {
                           <td className="px-4 py-2 font-mono" title={call.reference_price_source}>
                             {formatNumber(call.reference_price)}
                           </td>
-                          <td className="px-4 py-2 font-mono">{formatNumber(p.current_price)}</td>
+                          <td className="px-4 py-2 font-mono text-xs">
+                            {call.stop_price !== null && call.target_price !== null ? (
+                              <>
+                                <span className="text-negative">{formatNumber(call.stop_price)}</span>
+                                <span className="text-ink-faint"> / </span>
+                                <span className="text-positive">{formatNumber(call.target_price)}</span>
+                              </>
+                            ) : (
+                              <span className="text-ink-faint">—</span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2 text-left">
+                            <PlanStatus call={call} />
+                          </td>
+                          <td className="px-4 py-2 font-mono">
+                            {p.current_price === null ? (
+                              <span className="whitespace-nowrap text-xs text-ink-faint" title="The first closing price after the call date has not been loaded yet. Use Update prices after the market closes.">
+                                waiting for next close
+                              </span>
+                            ) : (
+                              formatNumber(p.current_price)
+                            )}
+                          </td>
                           <td className={`px-4 py-2 font-mono ${tone(p.return_now)}`}>{pct(p.return_now)}</td>
                           <td className={`px-4 py-2 font-mono ${tone(p.excess_vs_spy_now)}`}>
                             {pct(p.excess_vs_spy_now)}
@@ -219,4 +243,32 @@ function Stat({ label, value, className = "text-ink" }: { label: string; value: 
       <dd className={`font-mono ${className}`}>{value}</dd>
     </div>
   );
+}
+
+function PlanStatus({ call }: { call: TrackedCall }) {
+  const when = call.plan_status_date ? formatDate(call.plan_status_date) : "";
+  switch (call.plan_status) {
+    case "stop_hit":
+      return (
+        <span className="text-xs text-negative" title="Closed at or below the stop-loss: the plan says sell.">
+          Stop hit {when} — sell
+        </span>
+      );
+    case "target_hit":
+      return (
+        <span className="text-xs text-positive" title="Closed at or above the target: consider taking profit.">
+          Target hit {when}
+        </span>
+      );
+    case "time_up":
+      return (
+        <span className="text-xs text-warning" title="The hold period is over: sell, or rescore before keeping it.">
+          Time up {when} — review
+        </span>
+      );
+    case "open":
+      return <span className="text-xs text-ink-muted">Holding until {when}</span>;
+    default:
+      return <span className="text-xs text-ink-faint" title="Tracked before holding plans existed.">No plan</span>;
+  }
 }

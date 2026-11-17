@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.analysis.holding import plan_status
 from app.analysis.performance import HORIZONS, Bar, call_performance, summary
 from app.core.errors import ConflictError, NotFoundError
 from app.models import HistoricalPrice, Recommendation, Stock, StockScore
@@ -22,7 +23,7 @@ from app.schemas.performance import (
     TrackCallRequest,
     TrackRecord,
 )
-from app.services import ingestion, scoring_pipeline
+from app.services import holding, ingestion, scoring_pipeline
 from app.services.stocks import LOCAL_SOURCE, find_stock
 
 BENCHMARKS = ("SPY", "QQQ", "IWM")
@@ -102,6 +103,11 @@ def track_call(
             current.reason or UnavailableReason.NO_STORED_DATA,
             f"Could not score {ticker} at its latest price: {current.message}",
         )
+    # Record the holding plan as it stood when the call was made, so later
+    # changes to the rules or prices cannot move the goalposts.
+    plan = holding.get_plan(db, ticker)
+    stop_pct = plan.data.stop_pct if plan.status == DataStatus.OK and plan.data else None
+    target_pct = plan.data.target_pct if plan.status == DataStatus.OK and plan.data else None
     call = Recommendation(
         stock_id=stock.id,
         recommended_on=latest.date,
@@ -111,6 +117,8 @@ def track_call(
         score_at_recommendation=current.data.total_score,
         risk_class=current.data.risk_class,
         thesis=request.thesis,
+        stop_pct=stop_pct,
+        target_pct=target_pct,
         status="open",
     )
     db.add(call)
@@ -124,6 +132,17 @@ def track_record(db: Session) -> TrackRecord:
         .join(Stock, Stock.id == Recommendation.stock_id)
         .order_by(Recommendation.recommended_on.desc(), Recommendation.id.desc())
     ).all()
+    # Calls recorded before holding plans existed get one from the prices
+    # known on the call date, never later ones.
+    filled = False
+    for call, _stock in rows:
+        if call.stop_pct is None:
+            levels = holding.levels_as_of(db, call.stock_id, call.recommended_on)
+            if levels:
+                call.stop_pct, call.target_pct = levels
+                filled = True
+    if filled:
+        db.commit()
     benchmarks = {symbol: _series_for(db, symbol) for symbol in BENCHMARKS}
     calls = [_call_out(db, call, stock, benchmarks) for call, stock in rows]
 
@@ -204,6 +223,16 @@ def _call_out(
     benchmarks: dict[str, list[Bar]] | None = None,
 ) -> CallOut:
     benchmarks = benchmarks or {symbol: _series_for(db, symbol) for symbol in BENCHMARKS}
+    series = _series(db, stock.id)
+    status, status_date = plan_status(
+        call.recommended_on,
+        call.stop_pct,
+        call.target_pct,
+        call.horizon_days,
+        [(b.date, b.close) for b in series if b.date > call.recommended_on],
+        call.reference_price,
+        datetime.now(UTC).date(),
+    )
     return CallOut(
         id=call.id,
         ticker=stock.ticker,
@@ -217,7 +246,15 @@ def _call_out(
         horizon_days=call.horizon_days,
         created_at=call.created_at,
         deletable=datetime.now(UTC) - call.created_at <= DELETE_WINDOW,
-        performance=call_performance(
-            call.recommended_on, call.reference_price, _series(db, stock.id), benchmarks
+        stop_pct=call.stop_pct,
+        target_pct=call.target_pct,
+        stop_price=call.reference_price * (1 + call.stop_pct)
+        if call.stop_pct is not None
+        else None,
+        target_price=(
+            call.reference_price * (1 + call.target_pct) if call.target_pct is not None else None
         ),
+        plan_status=status,
+        plan_status_date=status_date,
+        performance=call_performance(call.recommended_on, call.reference_price, series, benchmarks),
     )

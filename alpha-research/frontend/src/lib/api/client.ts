@@ -7,6 +7,7 @@
  */
 
 import type {
+  HoldingPlan,
   IndustryComparison,
   Scan,
   ScreenerRow,
@@ -183,6 +184,8 @@ export const api = {
 
   cancelScan: (id: number) => request<Scan>(`/screener/scans/${id}/cancel`, { method: "POST" }),
 
+  holdingPlan: (symbol: string) =>
+    request<DataResponse<HoldingPlan>>(`/stocks/${ticker(symbol)}/holding-plan`),
   industry: (symbol: string) =>
     request<DataResponse<IndustryComparison>>(`/stocks/${ticker(symbol)}/industry`),
 

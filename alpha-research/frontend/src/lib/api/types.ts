@@ -309,6 +309,13 @@ export interface TrackedCall {
   created_at: string;
   /** True only within 24 hours of the call being recorded. */
   deletable: boolean;
+  /** The holding plan recorded with the call; null for older calls. */
+  stop_pct: number | null;
+  target_pct: number | null;
+  stop_price: number | null;
+  target_price: number | null;
+  plan_status: "open" | "stop_hit" | "target_hit" | "time_up" | "no_plan";
+  plan_status_date: string | null;
   /** Returns as fractions; null means pending or not available. */
   performance: Record<string, number | null>;
 }
@@ -374,4 +381,32 @@ export interface IndustryComparison {
   positioning: Record<string, number | null>;
   valuation: Record<string, number | null>;
   rows: PeerRow[];
+}
+
+export interface PlanCheck {
+  label: string;
+  passed: boolean;
+  detail: string;
+}
+
+/** Rules-based guidance for a 1-3 month hold. */
+export interface HoldingPlan {
+  ticker: string;
+  as_of: string;
+  price: number;
+  atr: number;
+  stop_pct: number;
+  stop_price: number;
+  target_pct: number;
+  target_price: number;
+  typical_move_3m: number | null;
+  sma_50: number | null;
+  check_in_on: string;
+  ends_on: string;
+  next_earnings: string | null;
+  fit: "good" | "mixed" | "poor" | "unknown";
+  checks: PlanCheck[];
+  driver: string | null;
+  warnings: string[];
+  score: number | null;
 }

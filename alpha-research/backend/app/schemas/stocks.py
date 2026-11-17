@@ -225,3 +225,33 @@ class IndustryComparison(BaseModel):
     positioning: dict[str, float | None]
     valuation: dict[str, float | None]
     rows: list[PeerRow]  # the stock first, then its peers
+
+
+class PlanCheck(BaseModel):
+    label: str
+    passed: bool
+    detail: str
+
+
+class HoldingPlan(BaseModel):
+    """Rules-based guidance for a 1-3 month hold (see app.analysis.holding)."""
+
+    ticker: str
+    as_of: date
+    price: float
+    atr: float
+    stop_pct: float
+    stop_price: float
+    target_pct: float
+    target_price: float
+    typical_move_3m: float | None
+    sma_50: float | None
+    check_in_on: date
+    ends_on: date
+    next_earnings: date | None
+    # good | mixed | poor | unknown
+    fit: str
+    checks: list[PlanCheck]
+    driver: str | None
+    warnings: list[str]
+    score: float | None

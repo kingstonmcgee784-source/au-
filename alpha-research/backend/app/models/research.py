@@ -61,6 +61,10 @@ class Recommendation(TimestampMixin, Base):
     score_at_recommendation: Mapped[float | None] = mapped_column(Float)
     risk_class: Mapped[str | None] = mapped_column(String(16))
     thesis: Mapped[str | None] = mapped_column(Text)
+    # The holding plan at the time of the call, relative to reference_price
+    # (e.g. -0.08 and 0.16). None for calls recorded before plans existed.
+    stop_pct: Mapped[float | None] = mapped_column(Float)
+    target_pct: Mapped[float | None] = mapped_column(Float)
     # open | closed | invalidated
     status: Mapped[str] = mapped_column(String(16), default="open")
 

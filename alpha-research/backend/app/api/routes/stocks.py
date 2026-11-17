@@ -11,6 +11,7 @@ from app.schemas.stocks import (
     EventsSyncResult,
     FinancialsSyncResult,
     FinancialStatementOut,
+    HoldingPlan,
     IndustryComparison,
     InsiderActivity,
     InsiderSyncResult,
@@ -24,6 +25,7 @@ from app.schemas.stocks import (
 from app.services import (
     catalysts,
     financials,
+    holding,
     industry,
     ingestion,
     insiders,
@@ -156,3 +158,9 @@ def catalyst_feed(db: DbSession, ticker: TickerPath) -> DataResponse[CatalystFee
 def industry_comparison(db: DbSession, ticker: TickerPath) -> DataResponse[IndustryComparison]:
     """How the stock ranks against stored peers with the same SEC industry code."""
     return industry.comparison(db, ticker)
+
+
+@router.get("/{ticker}/holding-plan", response_model=DataResponse[HoldingPlan])
+def holding_plan(db: DbSession, ticker: TickerPath) -> DataResponse[HoldingPlan]:
+    """Rules-based guidance for a 1-3 month hold: stop-loss, target, dates, fit."""
+    return holding.get_plan(db, ticker)

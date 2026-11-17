@@ -15,6 +15,7 @@ import {
 } from "@/lib/format";
 import { useApi } from "@/lib/hooks/use-api";
 
+import { HoldingPlanPanel } from "./holding-plan-panel";
 import { IndustryPanel } from "./industry-panel";
 import { ScoreBreakdownPanel } from "./score-breakdown";
 import { InsiderPanel } from "./insider-panel";
@@ -41,7 +42,9 @@ function TickerResearch({ ticker }: { ticker: string }) {
   const metrics = useApi(`metrics-${ticker}`, () => api.metrics(ticker));
   const insiders = useApi(`insiders-${ticker}`, () => api.insiders(ticker));
   const industry = useApi(`industry-${ticker}`, () => api.industry(ticker));
+  const plan = useApi(`plan-${ticker}`, () => api.holdingPlan(ticker));
   const reloadAll = () => {
+    plan.reload();
     score.reload();
     metrics.reload();
     insiders.reload();
@@ -64,6 +67,7 @@ function TickerResearch({ ticker }: { ticker: string }) {
         <QuotePanel ticker={ticker} />
         <ScorePanel state={score.state} onRetry={score.reload} />
       </div>
+      <HoldingPlanPanel state={plan.state} onRetry={plan.reload} />
       <ScoreBreakdownPanel ticker={ticker} state={score.state} onRetry={score.reload} />
       <MetricsPanel state={metrics.state} onRetry={metrics.reload} />
       <IndustryPanel state={industry.state} onRetry={industry.reload} />

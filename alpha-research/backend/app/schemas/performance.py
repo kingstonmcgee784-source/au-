@@ -10,7 +10,7 @@ from app.schemas.common import Ticker
 class TrackCallRequest(BaseModel):
     ticker: Ticker
     thesis: str | None = Field(default=None, max_length=2000)
-    horizon_days: int = Field(default=90, ge=7, le=365)
+    horizon_days: int = Field(default=91, ge=7, le=365)  # about 3 months
 
 
 class CallOut(BaseModel):
@@ -27,6 +27,15 @@ class CallOut(BaseModel):
     created_at: datetime
     # True only within 24 hours of the call being recorded (see services.performance).
     deletable: bool
+    # The holding plan recorded with the call (None for older calls).
+    stop_pct: float | None = None
+    target_pct: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    # open | stop_hit | target_hit | time_up | no_plan; the date is when the
+    # stop or target was first reached, or when the hold period ends.
+    plan_status: str = "no_plan"
+    plan_status_date: date | None = None
     # return_now, return_1w/1m/3m, max_gain, max_drawdown, benchmark returns
     # and excess returns; None means pending or not available.
     performance: dict[str, float | None]
