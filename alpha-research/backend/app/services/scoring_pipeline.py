@@ -166,7 +166,11 @@ def score_stock(
     db.add(row)
     _store_metrics(db, stock.id, as_of, metrics)
     db.commit()
-    return ok(score_out(ticker, row, metrics), source=METRICS_SOURCE, as_of=row.calculated_at)
+    response = ok(score_out(ticker, row, metrics), source=METRICS_SOURCE, as_of=row.calculated_at)
+    if warnings:
+        # Scored, but partly from older stored data: say which refreshes failed.
+        response.message = " ".join(warnings)
+    return response
 
 
 def latest_metrics(db: Session, ticker: str) -> DataResponse[MetricsSnapshot]:

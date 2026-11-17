@@ -54,8 +54,9 @@ def profile(db: DbSession, provider: MarketData, ticker: TickerPath) -> DataResp
 
 
 @router.get("/{ticker}/quote", response_model=DataResponse[Quote])
-def quote(provider: MarketData, ticker: TickerPath) -> DataResponse[Quote]:
-    return stocks.get_quote(provider, ticker)
+def quote(db: DbSession, provider: MarketData, ticker: TickerPath) -> DataResponse[Quote]:
+    """Live quote, or the last stored daily close (labelled) if none can be loaded."""
+    return stocks.get_quote(provider, ticker, db)
 
 
 @router.get("/{ticker}/financials", response_model=DataResponse[list[FinancialStatementOut]])

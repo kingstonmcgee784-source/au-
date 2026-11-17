@@ -140,3 +140,21 @@ def test_split_or_dividend_reloads_history(provider: FakeProvider, db: Session) 
     assert result.data.bars_stored == len(
         {b.date for b in provider.known["LIVN"] if b.date <= TODAY}
     )
+
+
+def test_quote_falls_back_to_the_stored_close(client: TestClient) -> None:
+    fake = FakeProvider({"ABC": bars(date(2026, 1, 1), 30, 10.0)})
+    app.dependency_overrides[market_data_provider] = lambda: fake
+    try:
+        client.post("/api/v1/stocks/ABC/sync-prices")
+        fake.fail_with = ProviderRateLimitError("Tiingo's request limit was reached.")
+        body = client.get("/api/v1/stocks/ABC/quote").json()
+        assert body["status"] == "ok"
+        assert body["data"]["price"] == 39.0  # last stored close
+        assert body["data"]["change"] == 1.0
+        assert "not a live price" in body["data"]["feed"]
+        assert body["source"] == "local_database"
+        # A ticker with nothing stored still reports the failure.
+        assert client.get("/api/v1/stocks/XYZ/quote").json()["status"] == "unavailable"
+    finally:
+        app.dependency_overrides.clear()

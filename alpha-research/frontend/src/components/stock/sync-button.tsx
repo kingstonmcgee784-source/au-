@@ -14,7 +14,7 @@ interface SyncButtonProps<T> {
   /** Runs the sync request. */
   run: () => Promise<DataResponse<T>>;
   /** Turns a successful result into a confirmation message. */
-  describe: (data: T) => string;
+  describe: (data: T, response: DataResponse<T>) => string;
   /** Called after a successful sync so the page can reload its data. */
   onSynced: () => void;
   /** True when the request worked but only partly (shown as a warning). */
@@ -39,9 +39,10 @@ export function SyncButton<T>({
     try {
       const response = await run();
       if (response.status === "ok" && response.data) {
+        // A message on a successful response means it only partly worked.
         setResult({
-          kind: isPartial?.(response.data) ? "warning" : "ok",
-          text: describe(response.data),
+          kind: isPartial?.(response.data) || response.message ? "warning" : "ok",
+          text: describe(response.data, response),
         });
         onSynced();
       } else {

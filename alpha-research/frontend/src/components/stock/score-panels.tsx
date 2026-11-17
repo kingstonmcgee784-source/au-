@@ -25,9 +25,12 @@ export function CalculateScoreButton({
       label="Calculate score"
       busyLabel="Loading data and scoring…"
       run={() => api.calculateScore(ticker)}
-      describe={(s) =>
+      describe={(s, response) =>
         `Scored ${formatNumber(s.total_score, 0)}/100 using ${Math.round(s.coverage * 100)}% of ` +
-        "the methodology. Prices, SEC statements, insider filings and 8-K events were refreshed first."
+        "the methodology. " +
+        (response.message
+          ? `Some data could not be refreshed, so older stored data was used for it: ${response.message}`
+          : "Prices, SEC statements, insider filings and 8-K events were refreshed first.")
       }
       onSynced={onScored}
     />

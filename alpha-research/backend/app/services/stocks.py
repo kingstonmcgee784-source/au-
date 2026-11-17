@@ -6,7 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Stock
+from app.models import HistoricalPrice, Stock
 from app.providers.base import (
     MarketDataProvider,
     ProviderError,
@@ -116,14 +116,49 @@ def get_profile(
     return ok(profile, source=provider.name)
 
 
-def get_quote(provider: MarketDataProvider | None, ticker: str) -> DataResponse[Quote]:
+def get_quote(
+    provider: MarketDataProvider | None, ticker: str, db: Session | None = None
+) -> DataResponse[Quote]:
     if provider is None:
-        return unavailable(
+        failure: DataResponse[Quote] = unavailable(
             UnavailableReason.PROVIDER_NOT_CONFIGURED,
             "Live quotes need a market data provider, and none is configured.",
         )
-    try:
-        quote = provider.get_quote(ticker)
-    except ProviderError as exc:
-        return provider_failure(exc, ticker)
-    return ok(quote, source=provider.name, as_of=quote.timestamp)
+    else:
+        try:
+            quote = provider.get_quote(ticker)
+            return ok(quote, source=provider.name, as_of=quote.timestamp)
+        except ProviderError as exc:
+            failure = provider_failure(exc, ticker)
+    if failure.reason == UnavailableReason.UNKNOWN_TICKER or db is None:
+        return failure
+    return _stored_close(db, ticker, failure.message or "") or failure
+
+
+def _stored_close(db: Session, ticker: str, why: str) -> DataResponse[Quote] | None:
+    """The last stored daily close, clearly labelled, when no live quote loads."""
+    stock = find_stock(db, ticker)
+    if stock is None:
+        return None
+    rows = db.scalars(
+        select(HistoricalPrice)
+        .where(HistoricalPrice.stock_id == stock.id)
+        .order_by(HistoricalPrice.date.desc())
+        .limit(2)
+    ).all()
+    if not rows:
+        return None
+    last = rows[0]
+    previous = rows[1].close if len(rows) > 1 else None
+    change = last.close - previous if previous else None
+    quote = Quote(
+        ticker=ticker,
+        price=last.close,
+        change=change,
+        change_percent=change / previous * 100 if change is not None and previous else None,
+        previous_close=previous,
+        volume=last.volume,
+        timestamp=last.retrieved_at,
+        feed=f"Last stored daily close ({last.date.isoformat()}), not a live price. {why}",
+    )
+    return ok(quote, source=LOCAL_SOURCE, as_of=last.retrieved_at)
