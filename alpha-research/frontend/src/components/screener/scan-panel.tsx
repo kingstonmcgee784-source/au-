@@ -145,6 +145,8 @@ export function ScanPanel({ onFinished }: { onFinished: () => void }) {
 function ScanProgress({ scan, onCancel }: { scan: Scan; onCancel: () => void }) {
   const active = ACTIVE.has(scan.status);
   const share = scan.total ? scan.completed / scan.total : 0;
+  const problems = scan.items.filter((i) => i.status === "failed" || i.status === "not_scored");
+  const scored = scan.items.filter((i) => i.status === "scored").length;
   return (
     <div className="mt-4 rounded-md border border-line p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -189,6 +191,24 @@ function ScanProgress({ scan, onCancel }: { scan: Scan; onCancel: () => void }) 
           </span>
         ))}
       </div>
+      {problems.length > 0 && (
+        <ul className="mt-3 space-y-1.5 border-t border-line pt-3 text-xs">
+          {problems.map((item) => (
+            <li key={item.ticker}>
+              <span className="font-mono font-semibold text-ink">{item.ticker}</span>{" "}
+              <span className={item.status === "failed" ? "text-negative" : "text-warning"}>
+                {item.status === "failed" ? "failed" : "not scored"}:
+              </span>{" "}
+              <span className="text-ink-muted">{item.message ?? "No reason given."}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!active && scored > 0 && (
+        <p className="mt-3 text-xs text-ink-muted">
+          {scored} {scored === 1 ? "stock was" : "stocks were"} scored: see the results below.
+        </p>
+      )}
     </div>
   );
 }

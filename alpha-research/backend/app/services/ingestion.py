@@ -181,6 +181,12 @@ def sync_financials(
         row.derived_items = statement.derived_items
         row.source = source.name
         row.retrieved_at = retrieved_at
+    # Remove stored periods the latest parse no longer produces, so statements
+    # from an earlier, mistaken parse cannot linger.
+    current = {(s.statement_type, s.period_type, s.period_end) for s in parsed}
+    for key, row in existing.items():
+        if key not in current:
+            db.delete(row)
     db.commit()
 
     period_ends = {s.period_end for s in parsed}

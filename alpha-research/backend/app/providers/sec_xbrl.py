@@ -19,7 +19,7 @@ Per-share figures and share counts are never derived this way, because they
 do not add up across quarters.
 """
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any, Literal
@@ -37,6 +37,10 @@ class LineItem:
     unit: str = "USD"
     # Flow items can be summed across quarters; per-share values and counts cannot.
     additive: bool = True
+    # "first": the first tag with a value wins. "largest": take the largest
+    # value across the tags, for totals that some companies also report a
+    # sub-total under one of the tags (e.g. revenue).
+    pick: str = "first"
 
 
 INCOME_ITEMS: tuple[LineItem, ...] = (
@@ -49,6 +53,7 @@ INCOME_ITEMS: tuple[LineItem, ...] = (
             "SalesRevenueNet",
             "RevenuesNetOfInterestExpense",
         ),
+        pick="largest",
     ),
     LineItem("cost_of_revenue", ("CostOfRevenue", "CostOfGoodsAndServicesSold")),
     LineItem("gross_profit", ("GrossProfit",)),
@@ -229,27 +234,46 @@ def _value(
     gaap: dict[str, Any], item: LineItem, end: date, period_type: PeriodType, instant: bool
 ) -> tuple[float, bool] | None:
     """Value of `item` for the period ending `end`, and whether it was derived."""
+    if item.pick == "largest":
+        found = [
+            v
+            for tag in item.tags
+            if (v := _tag_value(gaap, tag, item, end, period_type, instant)) is not None
+        ]
+        # Prefer reported values over derived ones, then the largest.
+        return max(found, key=lambda v: (not v[1], v[0])) if found else None
     for tag in item.tags:
-        facts = _facts(gaap, tag, item.unit)
-        if not facts:
-            continue
-        if instant:
-            match = next((f for f in facts if f.start is None and f.end == end), None)
-            if match:
-                return match.value, False
-            continue
+        value = _tag_value(gaap, tag, item, end, period_type, instant)
+        if value is not None:
+            return value
+    return None
 
-        durations = [f for f in facts if f.start is not None]
-        wanted = (80, 100) if period_type == "quarterly" else (350, 380)
-        direct = next(
-            (f for f in durations if f.end == end and wanted[0] <= _days(f) <= wanted[1]), None
-        )
-        if direct:
-            return direct.value, False
-        if period_type == "quarterly" and item.additive:
-            derived = _derive_quarter(durations, end)
-            if derived is not None:
-                return derived, True
+
+def _tag_value(
+    gaap: dict[str, Any],
+    tag: str,
+    item: LineItem,
+    end: date,
+    period_type: PeriodType,
+    instant: bool,
+) -> tuple[float, bool] | None:
+    """One tag's value for the period ending `end`, and whether it was derived."""
+    facts = _facts(gaap, tag, item.unit)
+    if instant:
+        match = next((f for f in facts if f.start is None and f.end == end), None)
+        return (match.value, False) if match else None
+
+    durations = [f for f in facts if f.start is not None]
+    wanted = (80, 100) if period_type == "quarterly" else (350, 380)
+    direct = next(
+        (f for f in durations if f.end == end and wanted[0] <= _days(f) <= wanted[1]), None
+    )
+    if direct:
+        return direct.value, False
+    if period_type == "quarterly" and item.additive:
+        derived = _derive_quarter(durations, end)
+        if derived is not None:
+            return derived, True
     return None
 
 
@@ -288,8 +312,10 @@ def _facts(gaap: dict[str, Any], tag: str, unit: str) -> list[_Fact]:
 def _reporting_periods(gaap: dict[str, Any]) -> dict[date, _Period]:
     """Each 10-K/10-Q's own period end, with its fiscal year and period label.
 
-    Within one filing the latest `end` date is the period the filing covers;
-    earlier dates in it are comparatives from prior periods.
+    The period a filing covers is the `end` date reported most often in it.
+    Earlier dates are comparatives from prior periods. Later dates do occur
+    too: subsequent events, such as a dividend declared after the quarter
+    closed, so the latest date is not a safe choice.
     """
     by_filing: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for concept in gaap.values():
@@ -300,8 +326,10 @@ def _reporting_periods(gaap: dict[str, Any]) -> dict[date, _Period]:
 
     periods: dict[date, _Period] = {}
     for rows in by_filing.values():
+        counts = Counter(r["end"] for r in rows)
         try:
-            end = max(date.fromisoformat(r["end"]) for r in rows)
+            # Most frequent end date; on a tie, the later one.
+            end = date.fromisoformat(max(counts, key=lambda e: (counts[e], e)))
         except ValueError:
             continue
         current = next((r for r in rows if r["end"] == end.isoformat()), rows[0])

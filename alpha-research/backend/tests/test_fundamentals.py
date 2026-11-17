@@ -11,10 +11,12 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import fundamentals_client
 from app.main import app
+from app.models import FinancialStatement, Stock
 from app.providers.base import ProviderAuthError, TickerNotFoundError
 from app.providers.sec_edgar import SecEdgarClient
 from app.providers.sec_xbrl import parse_company_facts
@@ -244,6 +246,19 @@ def test_sync_financials_then_read(client: TestClient, sec: FakeSec, db: Session
     again = client.get("/api/v1/stocks/TEST/financials?statement_type=income").json()
     assert len(again["data"]) == 5  # 4 quarters + 1 year
 
+    # A period that a newer parse no longer produces is removed.
+    stale = FinancialStatement(
+        stock_id=db.scalar(select(Stock.id).where(Stock.ticker == "TEST")),
+        statement_type="balance", period_type="quarterly", period_end=date(2025, 11, 20),
+        fiscal_year=2025, line_items={"shares_outstanding": 1.0}, source="sec_edgar",
+    )
+    db.add(stale)
+    db.commit()
+    stale_id = stale.id
+    client.post("/api/v1/stocks/TEST/sync-financials")
+    db.expire_all()
+    assert db.get(FinancialStatement, stale_id) is None
+
 
 def test_sync_financials_unknown_ticker(client: TestClient, sec: FakeSec) -> None:
     body = client.post("/api/v1/stocks/ZZZZ/sync-financials").json()
@@ -254,3 +269,30 @@ def test_sync_financials_not_configured(client: TestClient) -> None:
     body = client.post("/api/v1/stocks/TEST/sync-financials").json()
     assert body["reason"] == "provider_not_configured"
     assert "SEC_USER_AGENT" in body["message"]
+
+
+def test_subsequent_event_dates_do_not_change_the_period() -> None:
+    """A 10-Q can report an event after quarter end (e.g. a dividend declared later)."""
+    data = {"facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [f(130, Q3, "2025-09-30", "2025-07-01")]}},
+        "NetIncomeLoss": {"units": {"USD": [f(13, Q3, "2025-09-30", "2025-07-01")]}},
+        "CommonStockDividendsPerShareDeclared": {"units": {"USD/shares": [
+            f(0.5, Q3, "2025-10-20", "2025-10-20"),
+        ]}},
+    }}}
+    statements = parse_company_facts(data)
+    income = [s for s in statements if s.statement_type == "income"]
+    assert [s.period_end for s in income] == [date(2025, 9, 30)]
+    assert income[0].line_items == {"revenue": 130, "net_income": 13}
+
+
+def test_revenue_uses_the_largest_reported_figure() -> None:
+    """Some filers put a sub-total under `Revenues` and the total under another tag."""
+    data = {"facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [f(1398, Q1, "2025-03-31", "2025-01-01")]}},
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {"USD": [f(1559, Q1, "2025-03-31", "2025-01-01")]}
+        },
+    }}}
+    (statement,) = parse_company_facts(data)
+    assert statement.line_items["revenue"] == 1559
