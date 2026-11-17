@@ -2,8 +2,8 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, Float, ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import JSON, Boolean, Date, Float, ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, SourcedMixin, TimestampMixin, UTCDateTime, utcnow
 
@@ -74,3 +74,44 @@ class BacktestResult(Base):
     # Computed statistics, e.g. {"total_return": ..., "max_drawdown": ...}.
     metrics: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+
+class InsiderFiling(SourcedMixin, Base):
+    """A processed Form 4, stored even when it has no share transactions so it
+    is not downloaded again."""
+
+    __tablename__ = "insider_filings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stock_id: Mapped[int] = mapped_column(ForeignKey("stocks.id", ondelete="CASCADE"), index=True)
+    accession: Mapped[str] = mapped_column(String(32), unique=True)
+    filed_on: Mapped[date] = mapped_column(Date, index=True)
+    owner_name: Mapped[str] = mapped_column(String(255))
+    owner_role: Mapped[str] = mapped_column(String(255))
+
+    transactions: Mapped[list["InsiderTransaction"]] = relationship(
+        back_populates="filing", cascade="all, delete-orphan"
+    )
+
+
+class InsiderTransaction(Base):
+    """One non-derivative share transaction reported on a Form 4."""
+
+    __tablename__ = "insider_transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    filing_id: Mapped[int] = mapped_column(
+        ForeignKey("insider_filings.id", ondelete="CASCADE"), index=True
+    )
+    stock_id: Mapped[int] = mapped_column(ForeignKey("stocks.id", ondelete="CASCADE"), index=True)
+    transaction_date: Mapped[date] = mapped_column(Date, index=True)
+    code: Mapped[str] = mapped_column(String(4))
+    acquired: Mapped[bool] = mapped_column(Boolean)
+    shares: Mapped[float] = mapped_column(Float)
+    price: Mapped[float | None] = mapped_column(Float)
+    shares_after: Mapped[float | None] = mapped_column(Float)
+    direct: Mapped[bool | None] = mapped_column(Boolean)
+    under_10b5_1: Mapped[bool | None] = mapped_column(Boolean)
+    security: Mapped[str] = mapped_column(String(255))
+
+    filing: Mapped[InsiderFiling] = relationship(back_populates="transactions")

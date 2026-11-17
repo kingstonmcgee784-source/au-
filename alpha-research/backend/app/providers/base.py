@@ -6,11 +6,14 @@ these protocols and is selected in `app.providers.registry`.
 """
 
 from datetime import date
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import BaseModel
 
 from app.schemas.stocks import Quote, StockSummary
+
+if TYPE_CHECKING:
+    from app.providers.sec_edgar import CompanyInfo, FilingRef
 
 
 class ProviderError(Exception):
@@ -51,6 +54,12 @@ class FundamentalsSource(Protocol):
         ...
 
     def company_facts(self, cik: int) -> dict[str, Any]: ...
+
+    def company_info(self, cik: int) -> "CompanyInfo":
+        """Industry code and recent filings, newest first."""
+        ...
+
+    def filing_document(self, cik: int, filing: "FilingRef") -> str: ...
 
 
 class MarketDataProvider(Protocol):

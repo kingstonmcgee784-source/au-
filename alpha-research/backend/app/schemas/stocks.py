@@ -125,3 +125,35 @@ class MetricsSnapshot(BaseModel):
     ticker: str
     as_of: date
     values: dict[str, float | None]
+
+
+class InsiderSyncResult(BaseModel):
+    ticker: str
+    filings_checked: int
+    filings_added: int
+    transactions_added: int
+    filings_remaining: int
+    unreadable_filings: int
+
+
+class InsiderTransactionOut(BaseModel):
+    transaction_date: date
+    filed_on: date
+    owner_name: str
+    owner_role: str
+    code: str
+    description: str
+    acquired: bool
+    shares: float
+    price: float | None
+    value: float | None
+    shares_after: float | None
+    under_10b5_1: bool | None
+
+
+class InsiderActivity(BaseModel):
+    ticker: str
+    days: int
+    synced_at: datetime
+    summary: dict[str, float | None]
+    transactions: list[InsiderTransactionOut]

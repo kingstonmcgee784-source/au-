@@ -9,6 +9,8 @@ from app.schemas.common import DataResponse
 from app.schemas.stocks import (
     FinancialsSyncResult,
     FinancialStatementOut,
+    InsiderActivity,
+    InsiderSyncResult,
     MetricsSnapshot,
     PriceSyncResult,
     Quote,
@@ -16,7 +18,15 @@ from app.schemas.stocks import (
     StockSummary,
     TechnicalSnapshot,
 )
-from app.services import financials, ingestion, scores, scoring_pipeline, stocks, technicals
+from app.services import (
+    financials,
+    ingestion,
+    insiders,
+    scores,
+    scoring_pipeline,
+    stocks,
+    technicals,
+)
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -104,3 +114,19 @@ def calculate_score(
 def metrics(db: DbSession, ticker: TickerPath) -> DataResponse[MetricsSnapshot]:
     """The most recently calculated metrics (valuation, margins, growth, price behaviour)."""
     return scoring_pipeline.latest_metrics(db, ticker)
+
+
+@router.post("/{ticker}/sync-insiders", response_model=DataResponse[InsiderSyncResult])
+def sync_insiders(
+    db: DbSession, source: Fundamentals, ticker: TickerPath
+) -> DataResponse[InsiderSyncResult]:
+    """Load the last 180 days of Form 4 insider filings from SEC EDGAR."""
+    return insiders.sync_insiders(db, source, ticker)
+
+
+@router.get("/{ticker}/insiders", response_model=DataResponse[InsiderActivity])
+def insider_activity(
+    db: DbSession, ticker: TickerPath, days: Annotated[int, Query(ge=7, le=180)] = 180
+) -> DataResponse[InsiderActivity]:
+    """Stored insider transactions and a summary for the last `days` days."""
+    return insiders.get_activity(db, ticker, days)

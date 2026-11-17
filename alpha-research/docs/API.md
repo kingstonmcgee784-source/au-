@@ -89,6 +89,8 @@ class suffix (`MSFT`, `BRK.B`, `BF-B`).
 | `GET /stocks/{ticker}/score` | `StockScore` | Latest stored score, otherwise `no_stored_data` |
 | `POST /stocks/{ticker}/score?refresh=true` | `StockScore` | Refreshes prices (and SPY) and SEC statements, calculates metrics, scores and stores. `insufficient_history` when a core category cannot be rated |
 | `GET /stocks/{ticker}/metrics` | `MetricsSnapshot` | The most recently calculated metrics, keyed by name |
+| `POST /stocks/{ticker}/sync-insiders` | `InsiderSyncResult` | Reads Form 4 filings from the last 180 days that are not stored yet (up to 60 per call) |
+| `GET /stocks/{ticker}/insiders?days=180` | `InsiderActivity` | Stored non-derivative insider transactions, newest first, with a summary (buyers, bought, sold under or outside 10b5-1 plans). `no_stored_data` until filings are loaded |
 
 A `Quote` has `price`, `change`, `change_percent`, `previous_close`,
 `volume` and `timestamp`. It also has `feed`, which names the price feed.

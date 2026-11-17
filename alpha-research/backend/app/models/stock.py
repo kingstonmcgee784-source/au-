@@ -1,11 +1,11 @@
 """Securities and their price history."""
 
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import BigInteger, Boolean, Date, Float, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, SourcedMixin, TimestampMixin
+from app.models.base import Base, SourcedMixin, TimestampMixin, UTCDateTime
 
 
 class Stock(TimestampMixin, Base):
@@ -19,6 +19,10 @@ class Stock(TimestampMixin, Base):
     industry: Mapped[str | None] = mapped_column(String(128))
     currency: Mapped[str] = mapped_column(String(8), default="USD")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sic_code: Mapped[str | None] = mapped_column(String(8))
+    # When Form 4 filings were last loaded; None means never, which is
+    # different from "loaded, and there were no insider trades".
+    insiders_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     prices: Mapped[list["HistoricalPrice"]] = relationship(
         back_populates="stock", cascade="all, delete-orphan"

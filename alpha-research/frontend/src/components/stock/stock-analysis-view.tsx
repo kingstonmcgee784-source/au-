@@ -14,6 +14,7 @@ import {
 } from "@/lib/format";
 import { useApi } from "@/lib/hooks/use-api";
 
+import { InsiderPanel } from "./insider-panel";
 import { CalculateScoreButton, MetricsPanel, ScorePanel } from "./score-panels";
 import { TickerForm, useTickerParam } from "./ticker-form";
 
@@ -35,9 +36,11 @@ export function StockAnalysisView() {
 function TickerResearch({ ticker }: { ticker: string }) {
   const score = useApi(`score-${ticker}`, () => api.score(ticker));
   const metrics = useApi(`metrics-${ticker}`, () => api.metrics(ticker));
+  const insiders = useApi(`insiders-${ticker}`, () => api.insiders(ticker));
   const reloadAll = () => {
     score.reload();
     metrics.reload();
+    insiders.reload();
   };
   return (
     <div className="space-y-4">
@@ -48,6 +51,12 @@ function TickerResearch({ ticker }: { ticker: string }) {
         <ScorePanel state={score.state} onRetry={score.reload} />
       </div>
       <MetricsPanel state={metrics.state} onRetry={metrics.reload} />
+      <InsiderPanel
+        ticker={ticker}
+        state={insiders.state}
+        onRetry={insiders.reload}
+        onSynced={insiders.reload}
+      />
     </div>
   );
 }

@@ -94,15 +94,28 @@ CATEGORY_RULES: dict[str, tuple[int, tuple[SubRating, ...]]] = {
             SubRating("from_52w_high", ((-0.50, 0.3), (-0.20, 0.8), (-0.05, 0.6), (0.0, 0.4)), "Distance from 52-week high"),
         ),
     ),
+    # Insider (Form 4) activity only: 13F institutional holdings are not
+    # connected. Open-market buying is the strongest signal; selling outside
+    # a pre-arranged 10b5-1 plan, relative to company size, counts against.
+    "institutional": (
+        1,
+        (
+            SubRating("insider_buyers", ((0, 0.5), (1, 0.75), (3, 1.0)), "Insider open-market buyers (180 days)"),
+            SubRating(
+                "insider_discretionary_sales_to_market_cap",
+                ((0.0, 0.7), (0.001, 0.5), (0.01, 0.2), (0.03, 0.0)),
+                "Insider sales outside 10b5-1 plans vs market cap (180 days)",
+            ),
+        ),
+    ),
     # No data source yet: always unrated.
     "catalysts": (1, ()),
-    "institutional": (1, ()),
     "industry": (1, ()),
 }
 
 UNRATED_REASON = {
     "catalysts": "No news or event data source is connected.",
-    "institutional": "No 13F or insider (Form 4) data source is connected.",
+    "institutional": "Insider (Form 4) filings have not been loaded, and no 13F data is connected.",
     "industry": "No industry classification or peer data is connected.",
 }
 

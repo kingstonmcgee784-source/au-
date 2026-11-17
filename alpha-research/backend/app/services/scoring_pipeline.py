@@ -22,7 +22,7 @@ from app.models import FinancialMetric, FinancialStatement, HistoricalPrice, Sto
 from app.providers.base import FundamentalsSource, MarketDataProvider
 from app.schemas.common import DataResponse, DataStatus, UnavailableReason, ok, unavailable
 from app.schemas.stocks import MetricsSnapshot, StockScoreOut
-from app.services import ingestion
+from app.services import ingestion, insiders
 from app.services.scores import score_out
 from app.services.stocks import LOCAL_SOURCE, find_stock
 
@@ -61,6 +61,7 @@ def score_stock(
                 ingestion.sync_prices(db, market, BENCHMARK, history_years=history_years),
             ),
             ("financial statements", ingestion.sync_financials(db, fundamentals, ticker)),
+            ("insider filings", insiders.sync_insiders(db, fundamentals, ticker)),
         ):
             if result.status != DataStatus.OK:
                 warnings.append(f"Could not refresh {label}: {result.message}")
@@ -78,6 +79,14 @@ def score_stock(
         balance=_statements(db, stock.id, "balance"),
         prices=prices,
         benchmark=_prices(db, benchmark.id) if benchmark and benchmark.id != stock.id else [],
+    )
+    metrics.update(
+        insiders.insider_metrics(
+            db,
+            stock,
+            as_of=prices[-1].date if prices else datetime.now(UTC).date(),
+            market_cap=metrics.get("market_cap"),
+        )
     )
     ratings = rate(metrics)
     missing = [key for key in REQUIRED_CATEGORIES if ratings[key].rating is None]
@@ -103,6 +112,8 @@ def score_stock(
     notes = (
         f"Not scored for lack of data: {', '.join(unrated)}. " if unrated else ""
     ) + "Thresholds are absolute, not sector-relative (methodology v1)."
+    if points["institutional"] is not None:
+        notes += " Institutional and insider activity uses Form 4 insider trades only (no 13F)."
     if warnings:
         notes += " " + " ".join(warnings)
 

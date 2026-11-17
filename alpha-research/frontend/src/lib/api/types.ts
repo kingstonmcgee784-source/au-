@@ -208,3 +208,36 @@ export interface Watchlist {
   created_at: string;
   items: WatchlistItem[];
 }
+
+export interface InsiderSyncResult {
+  ticker: string;
+  filings_checked: number;
+  filings_added: number;
+  transactions_added: number;
+  filings_remaining: number;
+  unreadable_filings: number;
+}
+
+export interface InsiderTransaction {
+  transaction_date: string;
+  filed_on: string;
+  owner_name: string;
+  owner_role: string;
+  code: string;
+  description: string;
+  acquired: boolean;
+  shares: number;
+  price: number | null;
+  value: number | null;
+  shares_after: number | null;
+  /** True = under a pre-arranged Rule 10b5-1 plan; null = not stated. */
+  under_10b5_1: boolean | null;
+}
+
+export interface InsiderActivity {
+  ticker: string;
+  days: number;
+  synced_at: string;
+  summary: Record<string, number | null>;
+  transactions: InsiderTransaction[];
+}

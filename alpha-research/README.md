@@ -143,6 +143,31 @@ How the statements are built:
   this way, so those cells stay empty instead.
 - **Not built yet:** TTM statements.
 
+## Insider activity (SEC Form 4)
+
+On **Stock Analysis**, **Load insider filings** reads the last 180 days of Form 4
+filings, which insiders file when they buy or sell company shares. The same
+`SEC_USER_AGENT` setting is used, and no key is needed. **Calculate score**
+also loads them. From the command line:
+
+```bash
+cd alpha-research/backend && .venv/bin/python -m app.cli sync-insiders PLTR LIVN
+```
+
+- **What is shown:** only non-derivative share transactions. Each one is
+  labelled as an open-market buy, an open-market sale, a grant, an option
+  exercise, tax withholding, or a gift.
+- **10b5-1 plans:** a sale is marked as scheduled under a Rule 10b5-1 plan
+  when the Form 4 checkbox (`aff10b5One`) or one of its footnotes says so.
+  Older filings that state neither are shown as "Not stated".
+- **What feeds the score:** the number of distinct open-market buyers, and the
+  value of sales made outside 10b5-1 plans relative to market cap. Together
+  these rate the "Institutional and insider activity" category.
+  Institutional holdings from 13F filings are not connected yet.
+- **Not included:** amended filings (4/A), so trades are not double counted.
+- **Limit per load:** at most 60 filings are read at a time. Click again to
+  load older ones.
+
 ## Scoring
 
 On **Stock Analysis**, **Calculate score** refreshes the stock's prices and SEC
@@ -169,10 +194,10 @@ Rules that keep the score honest:
 - **Missing data is not zero.** A metric whose inputs are missing, or that is
   not meaningful (for example P/E with negative earnings), is left empty.
   Debt that a company does not report is not assumed to be zero.
-- **Unscored categories.** Catalysts, institutional/insider activity and
-  industry positioning have no data source yet, so they are not scored. The
-  total is the share of points earned in the categories that were rated,
-  shown with its **coverage** (normally 80%).
+- **Unscored categories.** Catalysts and industry positioning have no data
+  source yet, so they are not scored. Institutional and insider activity uses
+  Form 4 insider trades only. The total is the share of points earned in the
+  categories that were rated, shown with its **coverage** (normally 85%).
 - **Core categories are required.** A stock is not scored unless
   fundamentals, valuation, technicals and growth can all be rated.
   Otherwise the app says what data is missing.
@@ -211,7 +236,8 @@ cd alpha-research/frontend && npm run lint && npm run build
 | Health check: API, database connection, schema revision, integration status | Working |
 | Watchlists: create, delete, add and remove tickers | Working, stored in SQLite |
 | Technical indicators (EMA 9/20/21, SMA 50/100/200, RSI 14, MACD) | Calculated from stored Tiingo prices |
-| Metrics, 0–100 scores and rankings | Calculated from stored prices and SEC statements; 80% coverage until catalyst, ownership and industry data exist |
+| Metrics, 0–100 scores and rankings | Calculated from stored prices, SEC statements and Form 4 insider trades; 85% coverage until catalyst and industry data exist |
+| Insider activity (Form 4) | Loaded from SEC EDGAR on request; buys, sales, 10b5-1 status |
 | Stock search and profile | From Tiingo when configured, otherwise the local database |
 | Quotes, market overview (ETF proxies) | Live from Tiingo when configured |
 | Daily price history | Loaded from Tiingo into SQLite on request; incremental after the first load |

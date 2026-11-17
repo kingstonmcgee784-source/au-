@@ -13,6 +13,7 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import get_settings
 from app.db.session import _ensure_sqlite_directory
 from app.models import Base
+from app.models.base import UTCDateTime
 
 config = context.config
 
@@ -23,6 +24,16 @@ if not config.get_main_option("sqlalchemy.url"):
     config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 target_metadata = Base.metadata
+
+
+def render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
+    """Write app column types as plain SQLAlchemy types in migrations.
+
+    Migrations must not import application code, which changes over time.
+    """
+    if type_ == "type" and isinstance(obj, UTCDateTime):
+        return "sa.DateTime(timezone=True)"
+    return False
 
 
 def run_migrations_offline() -> None:
@@ -52,6 +63,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             # Batch mode lets ALTER TABLE operations work on SQLite.
             render_as_batch=True,
+            render_item=render_item,
         )
         with context.begin_transaction():
             context.run_migrations()

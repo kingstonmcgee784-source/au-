@@ -11,6 +11,8 @@ import type {
   FinancialStatement,
   FinancialsSyncResult,
   HealthResponse,
+  InsiderActivity,
+  InsiderSyncResult,
   MetricsSnapshot,
   MarketOverview,
   PeriodType,
@@ -127,6 +129,14 @@ export const api = {
 
   metrics: (symbol: string) =>
     request<DataResponse<MetricsSnapshot>>(`/stocks/${ticker(symbol)}/metrics`),
+
+  syncInsiders: (symbol: string) =>
+    request<DataResponse<InsiderSyncResult>>(`/stocks/${ticker(symbol)}/sync-insiders`, {
+      method: "POST",
+    }),
+
+  insiders: (symbol: string, days = 180) =>
+    request<DataResponse<InsiderActivity>>(`/stocks/${ticker(symbol)}/insiders?days=${days}`),
 
   rankings: (limit = 10) => request<DataResponse<RankingEntry[]>>(`/rankings?limit=${limit}`),
 

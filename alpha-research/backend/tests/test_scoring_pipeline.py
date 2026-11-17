@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import fundamentals_client, market_data_provider
 from app.main import app
+from app.providers.sec_edgar import CompanyInfo, FilingRef
 from tests.fakes import FakeProvider, bars
 
 
@@ -62,6 +63,12 @@ class FakeSec:
     def company_facts(self, cik: int) -> dict[str, Any]:
         return sec_facts()
 
+    def company_info(self, cik: int) -> CompanyInfo:
+        return CompanyInfo(sic="7372", sic_description="SERVICES-PREPACKAGED SOFTWARE", filings=[])
+
+    def filing_document(self, cik: int, filing: FilingRef) -> str:
+        raise AssertionError("no filings to download")
+
 
 @pytest.fixture
 def providers() -> Iterator[FakeProvider]:
@@ -80,12 +87,15 @@ def test_calculate_score_end_to_end(client: TestClient, providers: FakeProvider)
     assert body["status"] == "ok", body
     score = body["data"]
 
-    # Catalysts, institutional and industry have no data source: 80% coverage.
-    assert score["coverage"] == pytest.approx(0.8)
+    # Catalysts and industry have no data source yet: 85% coverage.
+    assert score["coverage"] == pytest.approx(0.85)
     categories = {c["key"]: c for c in score["categories"]}
-    for key in ("catalysts", "institutional", "industry"):
+    for key in ("catalysts", "industry"):
         assert categories[key]["points"] is None
         assert categories[key]["unrated_reason"]
+    # Insider filings were loaded (none in the window): rated, neutral to positive.
+    assert categories["institutional"]["points"] is not None
+    assert "Form 4" in score["notes"]
     for key in ("fundamentals", "valuation", "technical", "growth", "risk_reward"):
         assert categories[key]["points"] is not None, key
         assert categories[key]["inputs"], key
@@ -98,7 +108,7 @@ def test_calculate_score_end_to_end(client: TestClient, providers: FakeProvider)
     assert latest["data"]["total_score"] == score["total_score"]
     ranked = client.get("/api/v1/rankings").json()
     assert [r["ticker"] for r in ranked["data"]] == ["TEST"]
-    assert ranked["data"][0]["coverage"] == pytest.approx(0.8)
+    assert ranked["data"][0]["coverage"] == pytest.approx(0.85)
 
     metrics = client.get("/api/v1/stocks/TEST/metrics").json()
     assert metrics["status"] == "ok"
