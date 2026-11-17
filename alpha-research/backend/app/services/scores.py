@@ -50,7 +50,12 @@ def score_out(
         }
         values = {**{k: v for k, v in (metrics or {}).items() if v is not None}, **stored}
         rated = row.category_scores.get(category.key) is not None
-        breakdown, missing = ratings.input_details(category.key, values)
+        saved = {
+            b["metric"]: b["rating"]
+            for b in detail.get("breakdown") or []
+            if b.get("rating") is not None
+        }
+        breakdown, missing = ratings.input_details(category.key, values, saved)
         if not rated:
             breakdown = []  # too few inputs: only list what is missing
         categories.append(

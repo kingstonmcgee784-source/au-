@@ -28,6 +28,8 @@ from app.services.stocks import LOCAL_SOURCE, find_stock
 BENCHMARKS = ("SPY", "QQQ", "IWM")
 # Long enough to fix a mistake, short enough that results cannot be curated.
 DELETE_WINDOW = timedelta(hours=24)
+# A long weekend plus a holiday is at most 4 days without a new close.
+MAX_PRICE_AGE_DAYS = 5
 
 
 def track_call(
@@ -55,6 +57,9 @@ def track_call(
             f"Calculate a score for {ticker} before tracking it, so the call records what "
             "the score was.",
         )
+    # Load the newest prices first, so the call is not backdated to an old
+    # stored price (which would let a call "predict" moves already seen).
+    ingestion.sync_prices(db, market, ticker, history_years=history_years)
     latest = db.scalar(
         select(HistoricalPrice)
         .where(HistoricalPrice.stock_id == stock.id)
@@ -65,6 +70,14 @@ def track_call(
         return unavailable(
             UnavailableReason.NO_STORED_DATA,
             f"No stored price for {ticker}. Load its price history first.",
+        )
+    age = (datetime.now(UTC).date() - latest.date).days
+    if age > MAX_PRICE_AGE_DAYS:
+        return unavailable(
+            UnavailableReason.INSUFFICIENT_HISTORY,
+            f"The latest stored price for {ticker} is from {latest.date.isoformat()}, "
+            f"{age} days ago, and fresh prices could not be loaded. A call must be recorded "
+            "at a current price; try again when market data is available.",
         )
     exists = db.scalar(
         select(Recommendation.id).where(

@@ -272,3 +272,22 @@ def test_form4_about_another_company_is_not_counted(db: Session) -> None:
     other.lookup = lambda ticker: (9999, "Other Co")  # type: ignore[method-assign]
     second = sync_insiders(db, other, "OTHR", today=TODAY)
     assert second.data is not None and second.data.transactions_added == 1
+
+
+def test_partial_window_is_not_marked_loaded(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import insiders as service
+
+    monkeypatch.setattr(service, "MAX_FILINGS_PER_SYNC", 1)
+    fake = FakeSec(
+        {f"x{i}": form4(row("S", 10, 20.0, "D", day="2026-11-01")) for i in range(3)},
+        filed=TODAY - timedelta(days=5),
+    )
+    first = sync_insiders(db, fake, "TEST", today=TODAY)
+    assert first.data is not None and first.data.filings_remaining == 2
+    stock = db.scalar(select(Stock).where(Stock.ticker == "TEST"))
+    assert stock.insiders_synced_at is None  # not scored from a partial window
+
+    done = service.sync_all_insiders(db, fake, "TEST")
+    assert done.data is not None and done.data.filings_remaining == 0
+    db.refresh(stock)
+    assert stock.insiders_synced_at is not None

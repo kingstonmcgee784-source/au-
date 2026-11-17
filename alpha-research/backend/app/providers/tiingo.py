@@ -67,7 +67,8 @@ class TiingoProvider:
         for row in _as_list(rows):
             if not row.get("isActive", True):
                 continue
-            if row.get("countryCode") not in (None, "US"):
+            # Documented fields only: assetType is Stock, ETF or Mutual Fund.
+            if row.get("assetType") not in (None, "Stock", "ETF"):
                 continue
             ticker = str(row.get("ticker") or "").upper()
             if not ticker:

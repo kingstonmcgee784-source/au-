@@ -1,5 +1,7 @@
 """Industry peers and comparison, from stocks stored in the local database."""
 
+from datetime import date, timedelta
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -11,6 +13,8 @@ from app.schemas.stocks import IndustryComparison, PeerRow
 from app.services.stocks import LOCAL_SOURCE, find_stock
 
 METRICS_SOURCE = "alpha_research"
+# Peers scored longer ago than this are left out of comparisons.
+PEER_MAX_AGE = timedelta(days=45)
 SHOWN = ["market_cap", *POSITIONING, *VALUATION]
 
 
@@ -37,18 +41,35 @@ def latest_metrics_by_stock(db: Session) -> dict[int, Metrics]:
     return out
 
 
+def latest_metric_dates(db: Session) -> dict[int, date]:
+    """The date of each stock's most recently calculated metrics."""
+    rows = db.execute(
+        select(FinancialMetric.stock_id, func.max(FinancialMetric.as_of))
+        .where(FinancialMetric.source == METRICS_SOURCE)
+        .group_by(FinancialMetric.stock_id)
+    ).all()
+    return {stock_id: as_of for stock_id, as_of in rows}
+
+
 def industry_metrics(
-    db: Session, stock: Stock, metrics: Metrics
+    db: Session, stock: Stock, metrics: Metrics, as_of: date
 ) -> tuple[dict[str, float | None], str | None, list[Stock]]:
     """Percentiles against peers, to be added to a stock's metrics for scoring.
 
+    Only peers whose metrics were calculated within PEER_MAX_AGE of `as_of`
+    are compared, so returns and growth are measured over similar periods.
     Returns ({industry_pct_<metric>: percentile, industry_peer_count: n}, the
     SIC prefix used, the peer stocks). Empty when there are too few peers.
     """
     stocks = {s.id: s for s in db.scalars(select(Stock).where(Stock.sic_code.is_not(None)))}
     peer_metrics = latest_metrics_by_stock(db)
+    dates = latest_metric_dates(db)
     candidates = {
-        s.ticker: s.sic_code for sid, s in stocks.items() if sid != stock.id and sid in peer_metrics
+        s.ticker: s.sic_code
+        for sid, s in stocks.items()
+        if sid != stock.id
+        and sid in peer_metrics
+        and abs((dates[sid] - as_of).days) <= PEER_MAX_AGE.days
     }
     group = choose_group(stock.sic_code, candidates)
     if group is None:
@@ -75,7 +96,7 @@ def comparison(db: Session, ticker: str) -> DataResponse[IndustryComparison]:
             f"The SEC industry code for {ticker} is not known yet. Calculate its score to load it.",
         )
     own = all_metrics[stock.id]
-    _, prefix, peers = industry_metrics(db, stock, own)
+    _, prefix, peers = industry_metrics(db, stock, own, latest_metric_dates(db)[stock.id])
     if prefix is None:
         same = db.scalar(
             select(func.count(Stock.id)).where(
@@ -85,8 +106,9 @@ def comparison(db: Session, ticker: str) -> DataResponse[IndustryComparison]:
         return unavailable(
             UnavailableReason.INSUFFICIENT_HISTORY,
             f"Only {same or 0} other scored stocks share {ticker}'s industry (SIC "
-            f"{stock.sic_code}, {stock.industry or 'unknown'}). At least 4 are needed: scan "
-            "more stocks from this industry in the Screener.",
+            f"{stock.sic_code}, {stock.industry or 'unknown'}), and peers count only if scored "
+            f"within {PEER_MAX_AGE.days} days of it. At least 4 are needed: scan more stocks "
+            "from this industry in the Screener.",
         )
     scores = _latest_scores(db, [stock.id, *(p.id for p in peers)])
     peer_values = [all_metrics[p.id] for p in peers]

@@ -5,18 +5,21 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.analysis.performance import Bar, call_performance, summary
 from app.api.deps import market_data_provider
 from app.main import app
 from app.models import HistoricalPrice, Recommendation, Stock
+from app.providers.base import ProviderError
 from app.services.scoring_pipeline import score_stock
 from tests.fakes import FakeProvider, bars
 from tests.test_scoring_pipeline import FakeSec
 
 START = date(2026, 1, 1)
+# API tests need prices up to today, because calls are refused at stale prices.
+API_START = date.today() - timedelta(days=249)
 
 
 def series(closes: list[float], start: date = START) -> list[Bar]:
@@ -60,7 +63,7 @@ def test_summary_statistics() -> None:
 
 @pytest.fixture
 def market() -> Iterator[FakeProvider]:
-    fake = FakeProvider({symbol: bars(START, 120, 100.0) for symbol in ("SPY", "QQQ", "IWM")})
+    fake = FakeProvider({symbol: bars(API_START, 300, 100.0) for symbol in ("SPY", "QQQ", "IWM")})
     app.dependency_overrides[market_data_provider] = lambda: fake
     yield fake
     app.dependency_overrides.clear()
@@ -68,7 +71,7 @@ def market() -> Iterator[FakeProvider]:
 
 def scored_stock(db: Session, market: FakeProvider, days: int = 250) -> Stock:
     """A stock scored through the real pipeline (rising test prices, test SEC facts)."""
-    market.known["TEST"] = bars(START, days, 50.0)
+    market.known["TEST"] = bars(API_START, days, 50.0)
     result = score_stock(
         db, "TEST", market=market, fundamentals=FakeSec(), refresh=True, history_years=2
     )
@@ -99,7 +102,7 @@ def test_track_and_measure(client: TestClient, market: FakeProvider, db: Session
         db.add(
             HistoricalPrice(
                 stock_id=stock.id,
-                date=START + timedelta(days=i),
+                date=API_START + timedelta(days=i),
                 open=1,
                 high=1,
                 low=1,
@@ -144,3 +147,14 @@ def test_update_prices(client: TestClient, market: FakeProvider, db: Session) ->
     body = client.post("/api/v1/recommendations/update-prices").json()
     assert body["status"] == "ok"
     assert [r["ticker"] for r in body["data"]["results"]] == ["TEST", "SPY", "QQQ", "IWM"]
+
+
+def test_track_refuses_a_stale_price(client: TestClient, market: FakeProvider, db: Session) -> None:
+    scored_stock(db, market)
+    market.fail_with = ProviderError("down")  # fresh prices cannot be loaded
+    cutoff = date.today() - timedelta(days=30)
+    db.execute(delete(HistoricalPrice).where(HistoricalPrice.date > cutoff))
+    db.commit()
+    body = client.post("/api/v1/recommendations", json={"ticker": "TEST"}).json()
+    assert body["status"] == "unavailable"
+    assert "days ago" in body["message"]

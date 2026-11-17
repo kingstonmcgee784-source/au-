@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.analysis.industry import choose_group, percentile, percentiles
@@ -199,3 +199,18 @@ def test_industry_needs_enough_peers(
     body = client.get("/api/v1/stocks/AAA/industry").json()
     assert body["status"] == "unavailable"
     assert "At least 4 are needed" in body["message"]
+
+
+def test_stale_peers_are_left_out(client: TestClient, market: LimitedProvider, db: Session) -> None:
+    from app.models import FinancialMetric, Stock
+
+    run_scan(db, market, TICKERS)
+    assert client.get("/api/v1/stocks/AAA/industry").json()["status"] == "ok"
+    # Two peers' metrics now date from months earlier: too few current peers remain.
+    old_ids = db.scalars(select(Stock.id).where(Stock.ticker.in_(["DDD", "EEE"]))).all()
+    for row in db.scalars(select(FinancialMetric).where(FinancialMetric.stock_id.in_(old_ids))):
+        row.as_of = row.as_of - timedelta(days=120)
+    db.commit()
+    body = client.get("/api/v1/stocks/AAA/industry").json()
+    assert body["status"] == "unavailable"
+    assert "within 45 days" in body["message"]

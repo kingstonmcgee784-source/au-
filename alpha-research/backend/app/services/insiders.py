@@ -3,7 +3,7 @@
 import logging
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.analysis.insider import Trade, summarize
@@ -101,7 +101,11 @@ def sync_insiders(
         added_filings += 1
         added_trades += len(trades)
 
-    stock.insiders_synced_at = retrieved_at
+    remaining = len(pending) - len(batch)
+    if remaining == 0:
+        # Only a complete window counts as loaded; scoring a partial one would
+        # understate activity.
+        stock.insiders_synced_at = retrieved_at
     db.commit()
     return ok(
         InsiderSyncResult(
@@ -109,13 +113,25 @@ def sync_insiders(
             filings_checked=len(candidates),
             filings_added=added_filings,
             transactions_added=added_trades,
-            filings_remaining=len(pending) - len(batch),
+            filings_remaining=remaining,
             unreadable_filings=unreadable,
             other_issuer_filings=other_issuer,
         ),
         source=source.name,
         as_of=retrieved_at,
     )
+
+
+def sync_all_insiders(
+    db: Session, source: FundamentalsSource | None, ticker: str, *, max_rounds: int = 10
+) -> DataResponse[InsiderSyncResult]:
+    """Keep reading Form 4 filings until the 180-day window is complete."""
+    result = sync_insiders(db, source, ticker)
+    rounds = 1
+    while result.data is not None and result.data.filings_remaining > 0 and rounds < max_rounds:
+        result = sync_insiders(db, source, ticker)
+        rounds += 1
+    return result
 
 
 def stored_trades(
@@ -145,10 +161,20 @@ def insider_metrics(
 def get_activity(db: Session, ticker: str, days: int) -> DataResponse[InsiderActivity]:
     stock = find_stock(db, ticker)
     if stock is None or stock.insiders_synced_at is None:
-        return unavailable(
-            UnavailableReason.NO_STORED_DATA,
-            f"Insider filings for {ticker} have not been loaded. Use Load insider filings.",
+        loaded = (
+            db.scalar(
+                select(func.count(InsiderFiling.id)).where(InsiderFiling.stock_id == stock.id)
+            )
+            if stock
+            else 0
         )
+        message = (
+            f"Insider filings for {ticker} are only partly loaded ({loaded} read so far). "
+            "Use Load insider filings again to finish."
+            if loaded
+            else f"Insider filings for {ticker} have not been loaded. Use Load insider filings."
+        )
+        return unavailable(UnavailableReason.NO_STORED_DATA, message)
     today = datetime.now(UTC).date()
     rows = stored_trades(db, stock.id, today - timedelta(days=days))
     market_cap = db.scalar(

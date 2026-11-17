@@ -156,26 +156,26 @@ def test_network_failure_is_a_provider_error() -> None:
         provider.get_quote("SPY")
 
 
-def test_search_skips_inactive_and_foreign_listings() -> None:
+def test_search_keeps_active_stocks_and_etfs() -> None:
     provider = provider_with(
         {
             "/tiingo/utilities/search": httpx.Response(
                 200,
                 json=[
+                    {"ticker": "AAPL", "name": "Apple Inc", "assetType": "Stock", "isActive": True},
+                    {"ticker": "OLD", "name": "Old Co", "assetType": "Stock", "isActive": False},
                     {
-                        "ticker": "AAPL",
-                        "name": "Apple Inc",
-                        "assetType": "Stock",
+                        "ticker": "APLFX",
+                        "name": "Apple Fund",
+                        "assetType": "Mutual Fund",
                         "isActive": True,
-                        "countryCode": "US",
                     },
-                    {"ticker": "OLD", "name": "Old Co", "isActive": False, "countryCode": "US"},
-                    {"ticker": "APC", "name": "Apple (DE)", "isActive": True, "countryCode": "DE"},
+                    {"ticker": "SPY", "name": "SPDR S&P 500", "assetType": "ETF", "isActive": True},
                 ],
             )
         }
     )
-    assert [s.ticker for s in provider.search("apple", 10)] == ["AAPL"]
+    assert [s.ticker for s in provider.search("apple", 10)] == ["AAPL", "SPY"]
 
 
 def test_rate_limit_serves_cached_quote() -> None:

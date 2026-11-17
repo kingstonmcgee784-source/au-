@@ -62,7 +62,7 @@ def score_stock(
                 ingestion.sync_prices(db, market, BENCHMARK, history_years=history_years),
             ),
             ("financial statements", ingestion.sync_financials(db, fundamentals, ticker)),
-            ("insider filings", insiders.sync_insiders(db, fundamentals, ticker)),
+            ("insider filings", insiders.sync_all_insiders(db, fundamentals, ticker)),
             ("SEC 8-K events", catalysts.sync_events(db, fundamentals, ticker)),
         ):
             if result.status != DataStatus.OK:
@@ -91,7 +91,8 @@ def score_stock(
             market_cap=metrics.get("market_cap"),
         )
     )
-    peer_metrics, peer_prefix, _ = industry.industry_metrics(db, stock, metrics)
+    as_of = prices[-1].date if prices else datetime.now(UTC).date()
+    peer_metrics, peer_prefix, _ = industry.industry_metrics(db, stock, metrics, as_of)
     metrics.update(peer_metrics)
     ratings = rate(metrics)
     missing = [key for key in REQUIRED_CATEGORIES if ratings[key].rating is None]
@@ -103,7 +104,6 @@ def score_stock(
         )
 
     total, points, coverage = scoring.partial_score({k: r.rating for k, r in ratings.items()})
-    as_of = prices[-1].date if prices else datetime.now(UTC).date()
     details: dict[str, object] = {
         key: {
             "inputs": rating.used,

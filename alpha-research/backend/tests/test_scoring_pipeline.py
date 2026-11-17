@@ -122,7 +122,9 @@ def test_calculate_score_end_to_end(client: TestClient, providers: FakeProvider)
             assert item["value_text"] and item["scale"], item
     pe = next(i for i in categories["valuation"]["breakdown"] if i["metric"] == "pe_ttm")
     assert pe["value_text"].endswith("×")
-    assert pe["scale"] == "Full marks at 10.0× or lower; zero at 60.0× or higher"
+    assert pe["scale"].startswith(
+        "10.0× or lower: 100% · 20.0×: 70% · 35.0×: 35% · 60.0× or higher: 0%"
+    )
     assert 0 <= score["total_score"] <= 100
     assert score["risk_class"] in {"Low", "Moderate", "Elevated", "High", "Speculative"}
     assert "Not scored for lack of data" in score["notes"]

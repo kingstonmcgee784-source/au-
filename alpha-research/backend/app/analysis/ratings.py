@@ -199,8 +199,8 @@ UNRATED_REASON = {
     "catalysts": "SEC 8-K events have not been loaded for this stock.",
     "institutional": "Insider (Form 4) filings have not been loaded, and no 13F data is connected.",
     "industry": (
-        "Fewer than 4 scored stocks share this industry code. Scan more stocks from the "
-        "same industry in the Screener."
+        "Fewer than 4 stocks with this industry code were scored within 45 days of this one. "
+        "Scan more stocks from the same industry in the Screener."
     ),
 }
 
@@ -302,31 +302,47 @@ def format_value(metric: str, value: float) -> str:
     return f"{value:.2f}"
 
 
-def describe_scale(metric: str, curve: Curve) -> str:
-    """Plain-language summary of a threshold table, e.g. 'Full marks at 10.0× or lower'."""
-    points = sorted(curve)
-    top = max(y for _, y in points)
-    low = min(y for _, y in points)
-    best = [x for x, y in points if y == top]
-    worst = [x for x, y in points if y == low]
-    fmt = lambda x: format_value(metric, x)  # noqa: E731
-
-    def where(xs: list[float], is_top: bool) -> str:
-        if len(xs) > 1:
-            return f"between {fmt(xs[0])} and {fmt(xs[-1])}"
-        x = xs[0]
-        if x == points[0][0]:
-            return f"at {fmt(x)} or lower"
-        if x == points[-1][0]:
-            return f"at {fmt(x)} or higher"
-        return f"at {fmt(x)}"
-
-    full = "Full marks" if top == 1.0 else f"Best ({top * 100:.0f}%)"
+def scale_point(metric: str, x: float) -> str:
+    """A threshold as written in a scale description."""
+    if metric.startswith("industry_pct_"):
+        return f"{x * 100:.0f}th percentile"
     if UNITS.get(metric) == "yesno":
-        answer = "Yes" if points[-1][1] == top else "No"
-        return f"{full} for {answer}, {low * 100:.0f}% otherwise"
-    bottom = "zero" if low == 0.0 else f"lowest ({low * 100:.0f}%)"
-    return f"{full} {where(best, True)}; {bottom} {where(worst, False)}"
+        return "Yes" if x >= 0.5 else "No"
+    return format_value(metric, x)
+
+
+def describe_scale(metric: str, curve: Curve) -> str:
+    """Every threshold and its rating, e.g. '10.0× or lower: 100% · 60.0× or higher: 0%'.
+
+    Ratings change smoothly between the listed thresholds.
+    """
+    points = sorted(curve)
+    fmt = lambda x: scale_point(metric, x)  # noqa: E731
+    if UNITS.get(metric) == "yesno":
+        return " · ".join(f"{fmt(x)}: {y * 100:.0f}%" for x, y in reversed(points))
+    if metric.startswith("industry_pct_"):
+        return "Rating equals the peer percentile (50th percentile: 50%, best in group: 100%)"
+
+    # Merge neighbouring thresholds with the same rating into a range.
+    groups: list[tuple[float, float, float]] = []
+    for x, y in points:
+        if groups and groups[-1][2] == y:
+            groups[-1] = (groups[-1][0], x, y)
+        else:
+            groups.append((x, x, y))
+    parts = []
+    for index, (start, end, y) in enumerate(groups):
+        if start != end:
+            where = f"{fmt(start)} to {fmt(end)}"
+        else:
+            where = fmt(start)
+        if index == 0:
+            if not (UNITS.get(metric) == "count" and start == 0):  # counts cannot go below 0
+                where += " or lower" if start == end else " (and below)"
+        elif index == len(groups) - 1:
+            where += " or higher" if start == end else " (and above)"
+        parts.append(f"{where}: {y * 100:.0f}%")
+    return " · ".join(parts) + " (in between, the rating changes gradually)"
 
 
 def risk_class(metrics: Metrics) -> str | None:
@@ -525,17 +541,21 @@ def what_it_shows(metric: str, value: float) -> str:
 def why_this_rating(metric: str, value: float, curve: Curve) -> str:
     """How the value maps onto the scale, giving the rating it received."""
     points = sorted(curve)
-    fmt = lambda x: format_value(metric, x)  # noqa: E731
+    fmt = lambda x: scale_point(metric, x)  # noqa: E731
     rating = interpolate(value, curve)
     top = max(y for _, y in points)
     r = f"{rating * 100:.0f}%"
 
+    if UNITS.get(metric) == "yesno":
+        return f"{fmt(value)} earns {r} on this input."
+    if metric.startswith("industry_pct_"):
+        return f"Its peer rank converts directly into a {r} rating."
     if value <= points[0][0] or value >= points[-1][0]:
         edge_x, edge_y = points[0] if value <= points[0][0] else points[-1]
         if edge_y == top:
             what = "full marks" if top == 1.0 else f"the best rating this input can get ({r})"
             return f"That is at or past {fmt(edge_x)}, which earns {what}."
-        return f"That is at or past {fmt(edge_x)}, where the rating bottoms out at {r}."
+        return f"That is at or past {fmt(edge_x)}, where this end of the scale gives {r}."
 
     # Inside a flat top, e.g. a 10%-35% sweet spot.
     for (x0, y0), (x1, y1) in zip(points, points[1:], strict=False):
@@ -565,7 +585,11 @@ def meaning_of(metric: str) -> str:
     return text[:1].upper() + text[1:] + "." if text else ""
 
 
-def input_details(category: str, values: Mapping[str, float]) -> tuple[list[dict], list[str]]:
+def input_details(
+    category: str,
+    values: Mapping[str, float],
+    stored_ratings: Mapping[str, float] | None = None,
+) -> tuple[list[dict], list[str]]:
     """Inputs of a category with value, rating, scale and explanation, plus missing labels.
 
     Works from metric values alone, so it can rebuild the breakdown of scores
@@ -579,8 +603,17 @@ def input_details(category: str, values: Mapping[str, float]) -> tuple[list[dict
         if value is None:
             missing.append(sub.label)
             continue
-        rating = round(interpolate(value, sub.curve), 3)
+        current = round(interpolate(value, sub.curve), 3)
+        rating = (stored_ratings or {}).get(sub.metric, current)
         text = format_value(sub.metric, value)
+        if abs(rating - current) > 0.005:
+            # Saved under different rules: keep the saved rating and say so.
+            explanation = (
+                f"{verdict(rating)}. {what_it_shows(sub.metric, value)} Rated under an earlier "
+                "version of the scoring rules; recalculate the score to apply the current scale."
+            )
+        else:
+            explanation = explain(sub.metric, value, sub.curve)
         details.append(
             {
                 "metric": sub.metric,
@@ -589,7 +622,7 @@ def input_details(category: str, values: Mapping[str, float]) -> tuple[list[dict
                 "value_text": text,
                 "rating": rating,
                 "scale": describe_scale(sub.metric, sub.curve),
-                "explanation": explain(sub.metric, value, sub.curve),
+                "explanation": explanation,
                 "meaning": meaning_of(sub.metric),
             }
         )
