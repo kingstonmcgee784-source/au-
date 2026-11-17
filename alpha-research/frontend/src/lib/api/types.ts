@@ -328,6 +328,8 @@ export interface TrackRecord {
 
 export interface PriceUpdateResult {
   results: { ticker: string; ok: boolean; message: string }[];
+  /** True when the provider's request limit stopped the update part way. */
+  rate_limited: boolean;
 }
 
 export interface ScanItem {

@@ -159,3 +159,28 @@ def test_track_refuses_a_stale_price(client: TestClient, market: FakeProvider, d
     body = client.post("/api/v1/recommendations", json={"ticker": "TEST"}).json()
     assert body["status"] == "unavailable"
     assert "days ago" in body["message"]
+
+
+def test_update_prices_stops_at_the_rate_limit(
+    client: TestClient, market: FakeProvider, db: Session
+) -> None:
+    from app.providers.base import ProviderRateLimitError
+
+    scored_stock(db, market)
+    client.post("/api/v1/recommendations", json={"ticker": "TEST"})
+    # Make every stored price older than the 6-hour refresh interval.
+    db.execute(update(HistoricalPrice).values(retrieved_at=datetime.now(UTC) - timedelta(days=1)))
+    db.commit()
+    calls: list[str] = []
+    original = market.get_daily_prices
+
+    def limited(ticker, start, end=None):  # type: ignore[no-untyped-def]
+        calls.append(ticker)
+        raise ProviderRateLimitError("limit")
+
+    market.get_daily_prices = limited  # type: ignore[method-assign]
+    body = client.post("/api/v1/recommendations/update-prices").json()["data"]
+    market.get_daily_prices = original  # type: ignore[method-assign]
+    assert body["rate_limited"] is True
+    assert len(calls) == 1  # no requests after the first refusal
+    assert all("hourly request limit" in r["message"] for r in body["results"])

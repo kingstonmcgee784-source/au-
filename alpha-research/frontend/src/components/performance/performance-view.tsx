@@ -52,11 +52,17 @@ export function PerformanceView() {
         label="Update prices"
         busyLabel="Updating prices…"
         run={() => api.updateTrackedPrices()}
+        isPartial={(d) => d.results.some((r) => !r.ok)}
         describe={(d) => {
           const failed = d.results.filter((r) => !r.ok);
-          return failed.length === 0
-            ? `Prices checked for ${d.results.length} tickers (each refreshed at most every 6 hours).`
-            : `Some prices could not be updated: ${failed.map((r) => `${r.ticker} (${r.message})`).join("; ")}`;
+          if (failed.length === 0) {
+            return `Prices checked for ${d.results.length} tickers (each refreshed at most every 6 hours).`;
+          }
+          const updated = d.results.length - failed.length;
+          if (d.rate_limited) {
+            return `Tiingo's free plan allows 50 requests an hour, and that limit has been reached (a running scan uses it too). ${updated} of ${d.results.length} tickers were updated; try again in about an hour for ${failed.map((r) => r.ticker).join(", ")}.`;
+          }
+          return `Some prices could not be updated: ${failed.map((r) => `${r.ticker} (${r.message})`).join("; ")}`;
         }}
         onSynced={reload}
       />

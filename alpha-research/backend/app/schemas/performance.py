@@ -56,3 +56,5 @@ class PriceUpdate(BaseModel):
 
 class PriceUpdateResult(BaseModel):
     results: list[PriceUpdate]
+    # True when the provider's request limit stopped the update part way.
+    rate_limited: bool = False

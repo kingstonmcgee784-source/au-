@@ -6,7 +6,7 @@ import { useState } from "react";
 import { ApiError } from "@/lib/api/client";
 import type { DataResponse } from "@/lib/api/types";
 
-type Result = { kind: "ok" | "error"; text: string } | null;
+type Result = { kind: "ok" | "warning" | "error"; text: string } | null;
 
 interface SyncButtonProps<T> {
   label: string;
@@ -17,10 +17,19 @@ interface SyncButtonProps<T> {
   describe: (data: T) => string;
   /** Called after a successful sync so the page can reload its data. */
   onSynced: () => void;
+  /** True when the request worked but only partly (shown as a warning). */
+  isPartial?: (data: T) => boolean;
 }
 
 /** A button that loads data from a provider into the database. */
-export function SyncButton<T>({ label, busyLabel, run, describe, onSynced }: SyncButtonProps<T>) {
+export function SyncButton<T>({
+  label,
+  busyLabel,
+  run,
+  describe,
+  onSynced,
+  isPartial,
+}: SyncButtonProps<T>) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result>(null);
 
@@ -30,7 +39,10 @@ export function SyncButton<T>({ label, busyLabel, run, describe, onSynced }: Syn
     try {
       const response = await run();
       if (response.status === "ok" && response.data) {
-        setResult({ kind: "ok", text: describe(response.data) });
+        setResult({
+          kind: isPartial?.(response.data) ? "warning" : "ok",
+          text: describe(response.data),
+        });
         onSynced();
       } else {
         setResult({ kind: "error", text: response.message ?? "The data could not be loaded." });
@@ -62,7 +74,13 @@ export function SyncButton<T>({ label, busyLabel, run, describe, onSynced }: Syn
       </button>
       {result && (
         <p
-          className={`text-xs ${result.kind === "ok" ? "text-positive" : "text-negative"}`}
+          className={`text-xs ${
+            result.kind === "ok"
+              ? "text-positive"
+              : result.kind === "warning"
+                ? "text-warning"
+                : "text-negative"
+          }`}
           role="status"
         >
           {result.text}

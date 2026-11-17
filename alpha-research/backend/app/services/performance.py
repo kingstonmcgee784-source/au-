@@ -32,6 +32,7 @@ BENCHMARKS = ("SPY", "QQQ", "IWM")
 DELETE_WINDOW = timedelta(hours=24)
 # A long weekend plus a holiday is at most 4 days without a new close.
 MAX_PRICE_AGE_DAYS = 5
+RATE_LIMIT_SKIP = "Not updated: Tiingo's hourly request limit was reached."
 
 
 def track_call(
@@ -194,8 +195,17 @@ def update_prices(
         - set(BENCHMARKS)
     )
     results = []
+    limited = False
     for ticker in [*tickers, *BENCHMARKS, *context]:
+        if limited:
+            # More requests would only fail too, and still count against the limit.
+            results.append(PriceUpdate(ticker=ticker, ok=False, message=RATE_LIMIT_SKIP))
+            continue
         result = ingestion.sync_prices(db, market, ticker, history_years=history_years)
+        if result.reason == UnavailableReason.RATE_LIMITED:
+            limited = True
+            results.append(PriceUpdate(ticker=ticker, ok=False, message=RATE_LIMIT_SKIP))
+            continue
         if result.status == DataStatus.OK and result.data:
             results.append(
                 PriceUpdate(
@@ -204,7 +214,11 @@ def update_prices(
             )
         else:
             results.append(PriceUpdate(ticker=ticker, ok=False, message=result.message or ""))
-    return ok(PriceUpdateResult(results=results), source=market.name, as_of=datetime.now(UTC))
+    return ok(
+        PriceUpdateResult(results=results, rate_limited=limited),
+        source=market.name,
+        as_of=datetime.now(UTC),
+    )
 
 
 def _series_for(db: Session, ticker: str) -> list[Bar]:
