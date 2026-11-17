@@ -180,6 +180,8 @@ def test_old_scores_get_values_and_reasoning(
     valuation = next(c for c in body["data"]["categories"] if c["key"] == "valuation")
     pe = next(i for i in valuation["breakdown"] if i["metric"] == "pe_ttm")
     assert pe["value_text"].endswith("×")
-    assert pe["explanation"].startswith(("Strong (", "Good (", "Mixed (", "Weak (", "Poor ("))
-    assert "earnings" in pe["explanation"]
+    assert pe["explanation"].startswith(("Strong. ", "Good. ", "Mixed. ", "Weak. ", "Poor. "))
+    assert "for every $1 of yearly profit" in pe["explanation"]
+    assert "60.0×" in pe["explanation"] or "10.0×" in pe["explanation"]  # cites the scale
+    assert "earnings" in pe["meaning"]
     assert valuation["summary"].startswith(("Strongest", "All inputs"))

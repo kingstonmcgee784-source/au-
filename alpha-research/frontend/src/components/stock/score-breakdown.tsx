@@ -174,9 +174,9 @@ function CategorySection({
             <div className="-mx-3 overflow-x-auto">
               <table className="w-full min-w-[640px] table-fixed text-sm">
                 <colgroup>
-                  <col className="w-[24%]" />
-                  <col className="w-[11%]" />
-                  <col className="w-[15%]" />
+                  <col className="w-[26%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[14%]" />
                   <col className="w-[50%]" />
                 </colgroup>
                 <thead>
@@ -184,13 +184,20 @@ function CategorySection({
                     <th className="px-3 py-1 font-medium">Input</th>
                     <th className="px-3 py-1 text-right font-medium">Value</th>
                     <th className="px-3 py-1 font-medium">Rating</th>
-                    <th className="px-3 py-1 font-medium">Why</th>
+                    <th className="px-3 py-1 font-medium">Why it got this rating</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line/40">
                   {category.breakdown.map((input) => (
                     <tr key={input.metric} className="align-top">
-                      <td className="px-3 py-1.5 text-ink">{input.label}</td>
+                      <td className="px-3 py-1.5 text-ink">
+                        {input.label}
+                        {input.meaning && (
+                          <span className="mt-0.5 block text-[11px] leading-snug text-ink-faint">
+                            {input.meaning}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-1.5 text-right font-mono whitespace-nowrap text-ink">
                         {input.value_text ?? "—"}
                       </td>

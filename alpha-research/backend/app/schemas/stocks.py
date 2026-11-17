@@ -108,7 +108,8 @@ class ScoreInput(BaseModel):
     value_text: str | None  # e.g. "24.6×"; None for scores saved before breakdowns
     rating: float  # 0-1
     scale: str | None  # e.g. "Full marks at 10.0× or lower; zero at 60.0× or higher"
-    explanation: str | None = None  # what the value says about the stock, in plain language
+    explanation: str | None = None  # why it got its rating, in plain language
+    meaning: str | None = None  # what the measure is, in general
 
 
 class CategoryScore(BaseModel):

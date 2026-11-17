@@ -412,13 +412,157 @@ def verdict(rating: float) -> str:
     return "Poor"
 
 
-def explain(metric: str, value_text: str, rating: float) -> str:
-    """One sentence on what an input says about the stock."""
+def _pct(value: float) -> str:
+    return f"{abs(value) * 100:.1f}%"
+
+
+def what_it_shows(metric: str, value: float) -> str:
+    """What this stock's number actually means, in one sentence."""
     if metric.startswith("industry_pct_"):
-        meaning = "rank against peers with the same SEC industry code"
-    else:
-        meaning = MEANING.get(metric, "input to this category")
-    return f"{verdict(rating)} ({value_text}). What it measures: {meaning}."
+        return (
+            f"It ranks better than {value * 100:.0f}% of its stored industry peers on this measure."
+        )
+    v = value
+    match metric:
+        case "operating_margin":
+            return f"The company keeps {v * 100:.0f} cents of operating profit from every dollar of revenue."
+        case "fcf_margin":
+            return f"{v * 100:.0f} cents of every revenue dollar ends up as free cash after investment."
+        case "roe":
+            return f"It earns {_pct(v)} a year on shareholders' equity."
+        case "current_ratio":
+            return f"It has ${v:.2f} of short-term assets for every $1 of bills due within a year."
+        case "debt_to_equity":
+            return f"It carries ${v:.2f} of debt for every $1 of shareholders' equity."
+        case "share_change_yoy":
+            if v > 0:
+                return f"The share count grew {_pct(v)} in a year, diluting existing shareholders."
+            if v < 0:
+                return f"The share count fell {_pct(v)} in a year (buybacks), which helps shareholders."
+            return "The share count did not change over the year."
+        case "pe_ttm":
+            return (
+                f"Buyers pay ${v:.0f} for every $1 of yearly profit, roughly {v:.0f} years of "
+                "today's earnings."
+            )
+        case "ev_to_ebitda":
+            return f"The whole company, debt included, costs {v:.1f} times its yearly operating cash earnings."
+        case "price_to_sales":
+            return f"Buyers pay ${v:.2f} for every $1 of yearly revenue."
+        case "fcf_yield":
+            return f"At today's price, the business produces {_pct(v)} of its market value in free cash a year."
+        case "price_vs_sma200":
+            side = "above" if v >= 0 else "below"
+            extra = ", which is stretched" if v > 0.35 else ""
+            return f"The price is {_pct(v)} {side} its 200-day average{extra}."
+        case "sma50_above_sma200":
+            return (
+                "The 50-day average is above the 200-day: the medium-term trend is up."
+                if v >= 0.5
+                else "The 50-day average is below the 200-day: the medium-term trend is down."
+            )
+        case "rsi_14":
+            if v >= 70:
+                state = "stretched (overbought); short-term pullbacks are common from here"
+            elif v <= 30:
+                state = "oversold; selling may be overdone"
+            elif v >= 55:
+                state = "healthy and positive"
+            else:
+                state = "neutral to soft"
+            return f"Momentum (RSI {v:.0f}) is {state}."
+        case "relative_strength_6m":
+            word = "beat" if v >= 0 else "lagged"
+            return f"Over 6 months it {word} the S&P 500 by {_pct(v)}."
+        case "revenue_growth_yoy":
+            word = "grew" if v >= 0 else "fell"
+            return f"Revenue {word} {_pct(v)} versus the same quarter last year."
+        case "revenue_growth_ttm":
+            word = "grew" if v >= 0 else "fell"
+            return f"Revenue over the last 12 months {word} {_pct(v)} versus the 12 months before."
+        case "net_income_growth_ttm":
+            word = "grew" if v >= 0 else "fell"
+            return f"Profit over the last 12 months {word} {_pct(v)} versus the 12 months before."
+        case "revenue_acceleration":
+            word = "sped up" if v >= 0 else "slowed"
+            return f"Revenue growth {word} by {abs(v) * 100:.1f} points from the previous quarter."
+        case "volatility_1y":
+            return f"The price typically swings about {_pct(v)} over a year."
+        case "max_drawdown_1y":
+            return f"Its worst fall from a peak in the past year was {_pct(v)}."
+        case "from_52w_high":
+            if v >= -0.005:
+                return "It trades at or near its 52-week high."
+            return f"It trades {_pct(v)} below its 52-week high."
+        case "insider_buyers":
+            if v == 0:
+                return "No insider bought shares on the open market in the last 180 days."
+            return f"{v:.0f} insider(s) bought shares with their own money in the last 180 days."
+        case "insider_discretionary_sales_to_market_cap":
+            if v == 0:
+                return "Insiders made no sales outside pre-scheduled 10b5-1 plans in 180 days."
+            return (
+                f"Insiders sold shares worth {v * 100:.2f}% of the company's value outside "
+                "pre-scheduled plans in 180 days."
+            )
+        case "catalyst_red_flags_365d":
+            if v == 0:
+                return "No red-flag filings (restatements, impairments, auditor changes) in a year."
+            return f"{v:g} weighted red-flag filing(s) in the last year."
+        case "catalyst_material_events_180d":
+            if v == 0:
+                return "No major contracts or acquisitions were reported in six months."
+            return f"{v:.0f} major contract or acquisition filing(s) in six months."
+        case "catalyst_earnings_within_90d":
+            return (
+                "An earnings release is expected within 90 days, a near-term event."
+                if v >= 0.5
+                else "No earnings release is expected within 90 days."
+            )
+    return f"Value: {format_value(metric, value)}."
+
+
+def why_this_rating(metric: str, value: float, curve: Curve) -> str:
+    """How the value maps onto the scale, giving the rating it received."""
+    points = sorted(curve)
+    fmt = lambda x: format_value(metric, x)  # noqa: E731
+    rating = interpolate(value, curve)
+    top = max(y for _, y in points)
+    r = f"{rating * 100:.0f}%"
+
+    if value <= points[0][0] or value >= points[-1][0]:
+        edge_x, edge_y = points[0] if value <= points[0][0] else points[-1]
+        if edge_y == top:
+            what = "full marks" if top == 1.0 else f"the best rating this input can get ({r})"
+            return f"That is at or past {fmt(edge_x)}, which earns {what}."
+        return f"That is at or past {fmt(edge_x)}, where the rating bottoms out at {r}."
+
+    # Inside a flat top, e.g. a 10%-35% sweet spot.
+    for (x0, y0), (x1, y1) in zip(points, points[1:], strict=False):
+        if x0 <= value <= x1 and y0 == y1 == top:
+            return f"That is inside the {fmt(x0)} to {fmt(x1)} range that earns full marks."
+    for (x0, y0), (x1, y1) in zip(points, points[1:], strict=False):
+        if x0 <= value <= x1:
+            return (
+                f"That falls between {fmt(x0)} (rated {y0 * 100:.0f}%) and {fmt(x1)} "
+                f"(rated {y1 * 100:.0f}%) on the scale, so it rates {r}."
+            )
+    return f"It rates {r}."
+
+
+def explain(metric: str, value: float, curve: Curve) -> str:
+    """Why an input got its rating: what the number means, then where it sits on the scale."""
+    rating = interpolate(value, curve)
+    return (
+        f"{verdict(rating)}. {what_it_shows(metric, value)} {why_this_rating(metric, value, curve)}"
+    )
+
+
+def meaning_of(metric: str) -> str:
+    if metric.startswith("industry_pct_"):
+        return "Rank against stored peers with the same SEC industry code."
+    text = MEANING.get(metric, "")
+    return text[:1].upper() + text[1:] + "." if text else ""
 
 
 def input_details(category: str, values: Mapping[str, float]) -> tuple[list[dict], list[str]]:
@@ -445,7 +589,8 @@ def input_details(category: str, values: Mapping[str, float]) -> tuple[list[dict
                 "value_text": text,
                 "rating": rating,
                 "scale": describe_scale(sub.metric, sub.curve),
-                "explanation": explain(sub.metric, text, rating),
+                "explanation": explain(sub.metric, value, sub.curve),
+                "meaning": meaning_of(sub.metric),
             }
         )
     return details, missing
