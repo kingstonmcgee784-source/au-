@@ -150,7 +150,7 @@ def score_stock(
     db.add(row)
     _store_metrics(db, stock.id, as_of, metrics)
     db.commit()
-    return ok(score_out(ticker, row), source=METRICS_SOURCE, as_of=row.calculated_at)
+    return ok(score_out(ticker, row, metrics), source=METRICS_SOURCE, as_of=row.calculated_at)
 
 
 def latest_metrics(db: Session, ticker: str) -> DataResponse[MetricsSnapshot]:

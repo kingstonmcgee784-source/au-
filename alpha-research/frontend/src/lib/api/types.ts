@@ -138,6 +138,8 @@ export interface ScoreInput {
   rating: number;
   /** e.g. "Full marks at 10.0× or lower; zero at 60.0× or higher" */
   scale: string | null;
+  /** What the value says about the stock, in plain language. */
+  explanation: string | null;
 }
 
 export interface CategoryScore {
@@ -152,6 +154,8 @@ export interface CategoryScore {
   /** Inputs that had no data. */
   missing: string[];
   minimum_inputs: number;
+  /** Strongest and weakest inputs. */
+  summary: string | null;
   unrated_reason: string | null;
 }
 

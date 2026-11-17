@@ -13,7 +13,7 @@ points are interpolated linearly, and values outside the table take the
 nearest end point.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from app.analysis.metrics import Metrics
@@ -350,3 +350,116 @@ def risk_class(metrics: Metrics) -> str | None:
     if (metrics.get("net_income_ttm") or 0) < 0:
         level = min(level + 1, 4)
     return ("Low", "Moderate", "Elevated", "High", "Speculative")[level]
+
+
+# What each input measures and why it matters, in plain language.
+MEANING: dict[str, str] = {
+    "operating_margin": "share of revenue left after running the business; higher means a more "
+    "profitable company",
+    "fcf_margin": "share of revenue turned into free cash after investment; cash is harder to "
+    "flatter than accounting profit",
+    "roe": "profit earned per dollar of shareholders' equity; higher means capital is used well",
+    "current_ratio": "short-term assets compared with bills due within a year; below 1 can "
+    "mean cash pressure",
+    "debt_to_equity": "debt compared with shareholders' equity; less debt means less financial "
+    "risk",
+    "share_change_yoy": "change in the number of shares over a year; a rising count dilutes "
+    "existing shareholders",
+    "pe_ttm": "price paid for each dollar of the last 12 months' earnings; lower is cheaper",
+    "ev_to_ebitda": "company value including debt compared with operating cash earnings; "
+    "lower is cheaper",
+    "price_to_sales": "price paid for each dollar of the last 12 months' revenue; lower is cheaper",
+    "fcf_yield": "free cash flow as a share of market value: the cash return at today's price",
+    "price_vs_sma200": "distance above or below the 200-day average; above means an uptrend, "
+    "but far above can mean the stock is stretched",
+    "sma50_above_sma200": "whether the 50-day average is above the 200-day: the medium-term "
+    "trend is up",
+    "rsi_14": "momentum on a 0-100 scale; around 55-68 is healthy, above 70 is stretched, "
+    "below 30 is oversold",
+    "relative_strength_6m": "6-month return minus the S&P 500's: whether the stock is "
+    "beating the market",
+    "revenue_growth_yoy": "revenue in the latest quarter versus the same quarter a year ago",
+    "revenue_growth_ttm": "revenue over the last 12 months versus the 12 months before",
+    "net_income_growth_ttm": "profit over the last 12 months versus the 12 months before",
+    "revenue_acceleration": "whether revenue growth sped up or slowed down versus the "
+    "previous quarter",
+    "volatility_1y": "how much the price swings in a year; higher means a bumpier ride",
+    "max_drawdown_1y": "the largest fall from a peak in the last year",
+    "from_52w_high": "how far the price is below its 52-week high; a modest pullback is often "
+    "a better entry than the very top or a deep slump",
+    "insider_buyers": "number of insiders who bought shares with their own money; insiders "
+    "rarely buy unless they expect the stock to rise",
+    "insider_discretionary_sales_to_market_cap": "insider sales outside pre-scheduled plans, "
+    "relative to company size; heavy unplanned selling can be a warning",
+    "catalyst_red_flags_365d": "filings such as restatements, impairments, auditor changes or "
+    "bankruptcy in the last year",
+    "catalyst_material_events_180d": "major contracts or acquisitions reported in the last "
+    "six months",
+    "catalyst_earnings_within_90d": "whether an earnings release is expected soon, a "
+    "near-term event that can move the stock",
+}
+
+
+def verdict(rating: float) -> str:
+    if rating >= 0.85:
+        return "Strong"
+    if rating >= 0.6:
+        return "Good"
+    if rating >= 0.4:
+        return "Mixed"
+    if rating >= 0.2:
+        return "Weak"
+    return "Poor"
+
+
+def explain(metric: str, value_text: str, rating: float) -> str:
+    """One sentence on what an input says about the stock."""
+    if metric.startswith("industry_pct_"):
+        meaning = "rank against peers with the same SEC industry code"
+    else:
+        meaning = MEANING.get(metric, "input to this category")
+    return f"{verdict(rating)} ({value_text}). What it measures: {meaning}."
+
+
+def input_details(category: str, values: Mapping[str, float]) -> tuple[list[dict], list[str]]:
+    """Inputs of a category with value, rating, scale and explanation, plus missing labels.
+
+    Works from metric values alone, so it can rebuild the breakdown of scores
+    saved before breakdowns were stored.
+    """
+    _, subs = CATEGORY_RULES[category]
+    details: list[dict] = []
+    missing: list[str] = []
+    for sub in subs:
+        value = values.get(sub.metric)
+        if value is None:
+            missing.append(sub.label)
+            continue
+        rating = round(interpolate(value, sub.curve), 3)
+        text = format_value(sub.metric, value)
+        details.append(
+            {
+                "metric": sub.metric,
+                "label": sub.label,
+                "value": value,
+                "value_text": text,
+                "rating": rating,
+                "scale": describe_scale(sub.metric, sub.curve),
+                "explanation": explain(sub.metric, text, rating),
+            }
+        )
+    return details, missing
+
+
+def category_summary(inputs: list[dict]) -> str | None:
+    if not inputs:
+        return None
+    best = max(inputs, key=lambda i: i["rating"])
+    worst = min(inputs, key=lambda i: i["rating"])
+    if best is worst or best["rating"] == worst["rating"]:
+        return f"All inputs rate {round(best['rating'] * 100)}%."
+    return (
+        f"Strongest: {best['label']} ({best['value_text']}, "
+        f"{round(best['rating'] * 100)}%). Weakest: {worst['label']} "
+        f"({worst['value_text']}, {round(worst['rating'] * 100)}%)."
+    )

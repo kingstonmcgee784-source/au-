@@ -168,25 +168,26 @@ function CategorySection({
       {open && (
         <div className="space-y-3 px-3 pb-4 pl-10">
           <p className="text-xs text-ink-muted">{WHAT_IT_MEASURES[category.key]}</p>
+          {category.summary && <p className="text-sm text-ink">{category.summary}</p>}
 
           {category.breakdown.length > 0 && (
             <div className="-mx-3 overflow-x-auto">
               <table className="w-full min-w-[640px] table-fixed text-sm">
                 <colgroup>
-                  <col className="w-[32%]" />
-                  <col className="w-[13%]" />
-                  <col className="w-[17%]" />
-                  <col className="w-[38%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[50%]" />
                 </colgroup>
                 <thead>
                   <tr className="text-left text-[11px] uppercase tracking-wider text-ink-faint">
                     <th className="px-3 py-1 font-medium">Input</th>
                     <th className="px-3 py-1 text-right font-medium">Value</th>
                     <th className="px-3 py-1 font-medium">Rating</th>
-                    <th className="px-3 py-1 font-medium">Scale</th>
+                    <th className="px-3 py-1 font-medium">Why</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-line/40">
                   {category.breakdown.map((input) => (
                     <tr key={input.metric} className="align-top">
                       <td className="px-3 py-1.5 text-ink">{input.label}</td>
@@ -206,8 +207,13 @@ function CategorySection({
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 text-xs text-ink-faint">
-                        {input.scale ?? "Recalculate the score to see the scale."}
+                      <td className="px-3 py-1.5 text-xs">
+                        {input.explanation && (
+                          <span className="block text-ink-muted">{input.explanation}</span>
+                        )}
+                        {input.scale && (
+                          <span className="mt-0.5 block text-ink-faint">Scale: {input.scale}</span>
+                        )}
                       </td>
                     </tr>
                   ))}

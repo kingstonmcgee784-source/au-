@@ -1,10 +1,12 @@
 """Stored stock scores, rankings and the scoring methodology."""
 
+from collections.abc import Mapping
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.analysis import scoring
-from app.models import Stock, StockScore
+from app.analysis import ratings, scoring
+from app.models import FinancialMetric, Stock, StockScore
 from app.schemas.common import DataResponse, UnavailableReason, ok, unavailable
 from app.schemas.stocks import (
     CategoryScore,
@@ -27,35 +29,41 @@ def methodology() -> ScoringMethodology:
     )
 
 
-def score_out(ticker: str, row: StockScore) -> StockScoreOut:
+def score_out(
+    ticker: str, row: StockScore, metrics: Mapping[str, float | None] | None = None
+) -> StockScoreOut:
+    """A stored score with a full breakdown per category.
+
+    Input values come from the breakdown stored with the score, or, for scores
+    saved before breakdowns existed, from the metrics calculated for the same
+    date. Scales and explanations are always rebuilt from the rating rules.
+    """
     details = row.details or {}
     categories = []
     for category in scoring.CATEGORIES:
         detail = details.get(category.key)
         detail = detail if isinstance(detail, dict) else {}
-        inputs = detail.get("inputs") or {}
-        # Scores saved before breakdowns existed only have label -> rating.
-        breakdown = detail.get("breakdown") or [
-            {
-                "metric": label,
-                "label": label,
-                "value": None,
-                "value_text": None,
-                "rating": rating,
-                "scale": None,
-            }
-            for label, rating in inputs.items()
-        ]
+        stored = {
+            b["metric"]: b["value"]
+            for b in detail.get("breakdown") or []
+            if b.get("value") is not None
+        }
+        values = {**{k: v for k, v in (metrics or {}).items() if v is not None}, **stored}
+        rated = row.category_scores.get(category.key) is not None
+        breakdown, missing = ratings.input_details(category.key, values)
+        if not rated:
+            breakdown = []  # too few inputs: only list what is missing
         categories.append(
             CategoryScore(
                 key=category.key,
                 label=category.label,
                 weight=category.weight,
                 points=row.category_scores.get(category.key),
-                inputs=inputs,
+                inputs=detail.get("inputs") or {},
                 breakdown=[ScoreInput.model_validate(b) for b in breakdown],
-                missing=detail.get("missing") or [],
-                minimum_inputs=detail.get("minimum") or 1,
+                missing=missing,
+                minimum_inputs=ratings.CATEGORY_RULES[category.key][0],
+                summary=ratings.category_summary(breakdown),
                 unrated_reason=detail.get("unrated_reason"),
             )
         )
@@ -133,4 +141,14 @@ def get_latest_score(db: Session, ticker: str) -> DataResponse[StockScoreOut]:
             UnavailableReason.NO_STORED_DATA,
             f"{ticker} has not been scored yet. Use Calculate score to load its data and score it.",
         )
-    return ok(score_out(ticker, score), source=LOCAL_SOURCE, as_of=score.calculated_at)
+    metrics = {
+        m.metric: m.value
+        for m in db.scalars(
+            select(FinancialMetric).where(
+                FinancialMetric.stock_id == stock.id,
+                FinancialMetric.as_of == score.as_of,
+                FinancialMetric.source == "alpha_research",
+            )
+        )
+    }
+    return ok(score_out(ticker, score, metrics), source=LOCAL_SOURCE, as_of=score.calculated_at)

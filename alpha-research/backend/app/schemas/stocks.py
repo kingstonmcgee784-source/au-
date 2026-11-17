@@ -108,6 +108,7 @@ class ScoreInput(BaseModel):
     value_text: str | None  # e.g. "24.6×"; None for scores saved before breakdowns
     rating: float  # 0-1
     scale: str | None  # e.g. "Full marks at 10.0× or lower; zero at 60.0× or higher"
+    explanation: str | None = None  # what the value says about the stock, in plain language
 
 
 class CategoryScore(BaseModel):
@@ -119,6 +120,7 @@ class CategoryScore(BaseModel):
     breakdown: list[ScoreInput]
     missing: list[str]  # inputs that had no data
     minimum_inputs: int  # inputs needed to rate the category
+    summary: str | None = None  # strongest and weakest inputs
     unrated_reason: str | None
 
 

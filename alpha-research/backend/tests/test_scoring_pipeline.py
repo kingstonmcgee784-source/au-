@@ -161,3 +161,25 @@ def test_refuses_to_score_without_core_categories(client: TestClient) -> None:
     assert body["reason"] == "insufficient_history"
     assert "valuation needs" in body["message"] and "technical needs" in body["message"]
     assert client.get("/api/v1/rankings").json()["status"] == "unavailable"
+
+
+def test_old_scores_get_values_and_reasoning(
+    client: TestClient, providers: FakeProvider, db
+) -> None:
+    """Scores saved before breakdowns existed are explained from stored metrics."""
+    from sqlalchemy import select
+
+    from app.models import StockScore
+
+    client.post("/api/v1/stocks/TEST/score")
+    row = db.scalar(select(StockScore))
+    row.details = {k: {"inputs": v["inputs"]} for k, v in row.details.items()}  # old format
+    db.commit()
+
+    body = client.get("/api/v1/stocks/TEST/score").json()
+    valuation = next(c for c in body["data"]["categories"] if c["key"] == "valuation")
+    pe = next(i for i in valuation["breakdown"] if i["metric"] == "pe_ttm")
+    assert pe["value_text"].endswith("×")
+    assert pe["explanation"].startswith(("Strong (", "Good (", "Mixed (", "Weak (", "Poor ("))
+    assert "earnings" in pe["explanation"]
+    assert valuation["summary"].startswith(("Strongest", "All inputs"))
