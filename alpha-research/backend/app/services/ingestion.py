@@ -45,15 +45,19 @@ def sync_prices(
     today = today or datetime.now(UTC).date()
 
     stock = find_stock(db, ticker)
-    if stock is None:
+    if stock is None or stock.exchange is None:
+        # New stock, or one first created from SEC data, which has no exchange:
+        # fetch the market data profile once.
         try:
             profile = provider.get_profile(ticker)
         except ProviderError as exc:
             return provider_failure(exc, ticker)
-        stock = Stock(ticker=ticker, name=profile.name, exchange=profile.exchange)
-        db.add(stock)
+        if stock is None:
+            stock = Stock(ticker=ticker, name=profile.name)
+            db.add(stock)
+        stock.exchange = profile.exchange
         db.flush()
-    elif not force:
+    if not force:
         last_retrieved = db.scalar(
             select(func.max(HistoricalPrice.retrieved_at)).where(
                 HistoricalPrice.stock_id == stock.id

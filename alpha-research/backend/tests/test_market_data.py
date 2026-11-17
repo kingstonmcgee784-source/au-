@@ -113,3 +113,13 @@ def test_profile_is_stored_after_first_lookup(
 ) -> None:
     assert client.get("/api/v1/stocks/LIVN").json()["source"] == "fake"
     assert client.get("/api/v1/stocks/LIVN").json()["source"] == "local_database"
+
+
+def test_sync_fills_missing_exchange(provider: FakeProvider, db: Session) -> None:
+    """A stock first created from SEC data gets its exchange on the next price sync."""
+    db.add(Stock(ticker="LIVN", name="LivaNova PLC"))
+    db.commit()
+    sync_prices(db, provider, "LIVN", history_years=2, today=TODAY)
+    stock = db.scalar(select(Stock).where(Stock.ticker == "LIVN"))
+    assert stock.exchange == "NASDAQ"
+    assert stock.name == "LivaNova PLC"  # the SEC name is kept
