@@ -389,6 +389,20 @@ export interface PlanCheck {
   detail: string;
 }
 
+/** Trend of a stock's sector ETF, or of oil (USO). */
+export interface SectorTrend {
+  symbol: string;
+  label: string;
+  kind: "sector" | "oil";
+  last: number;
+  sma_50: number;
+  vs_sma_50: number;
+  return_1m: number | null;
+  return_3m: number | null;
+  direction: "up" | "down" | "mixed";
+  stock_vs_1m: number | null;
+}
+
 /** Rules-based guidance for a 1-3 month hold. */
 export interface HoldingPlan {
   ticker: string;
@@ -408,5 +422,8 @@ export interface HoldingPlan {
   checks: PlanCheck[];
   driver: string | null;
   warnings: string[];
+  context: SectorTrend[];
+  /** Sector or oil ETFs whose prices are not stored yet. */
+  context_missing: string[];
   score: number | null;
 }

@@ -16,7 +16,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.analysis import scoring
+from app.analysis import scoring, sector
 from app.analysis.metrics import Metrics, Period, PricePoint, compute_metrics
 from app.analysis.ratings import UNRATED_REASON, rate, risk_class
 from app.models import FinancialMetric, FinancialStatement, HistoricalPrice, StockScore
@@ -72,6 +72,10 @@ def score_stock(
                 warnings.append(f"Could not refresh {label}: {result.message}")
 
     stock = find_stock(db, ticker)
+    if refresh and stock is not None:
+        # Sector and oil ETFs for the holding plan (each refreshed at most every 6 hours).
+        for symbol, _label, _kind in sector.context_symbols(stock.sic_code):
+            ingestion.sync_prices(db, market, symbol, history_years=history_years)
     if stock is None:
         detail = " ".join(warnings) or f"{ticker} has no stored data."
         return unavailable(UnavailableReason.NO_STORED_DATA, f"Cannot score {ticker}. {detail}")

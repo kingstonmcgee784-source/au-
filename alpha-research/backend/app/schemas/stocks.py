@@ -233,6 +233,21 @@ class PlanCheck(BaseModel):
     detail: str
 
 
+class SectorTrend(BaseModel):
+    """Trend of the stock's sector ETF, or of oil (see app.analysis.sector)."""
+
+    symbol: str
+    label: str
+    kind: str
+    last: float
+    sma_50: float
+    vs_sma_50: float
+    return_1m: float | None
+    return_3m: float | None
+    direction: str
+    stock_vs_1m: float | None
+
+
 class HoldingPlan(BaseModel):
     """Rules-based guidance for a 1-3 month hold (see app.analysis.holding)."""
 
@@ -254,4 +269,7 @@ class HoldingPlan(BaseModel):
     checks: list[PlanCheck]
     driver: str | None
     warnings: list[str]
+    context: list[SectorTrend] = []
+    # Sector or oil ETFs this stock is matched to whose prices are not stored yet.
+    context_missing: list[str] = []
     score: float | None

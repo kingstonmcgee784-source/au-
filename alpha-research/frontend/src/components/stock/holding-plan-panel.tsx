@@ -4,7 +4,7 @@ import { CalendarClock, Check, TriangleAlert, X } from "lucide-react";
 
 import { DataView, SourceNote } from "@/components/ui/data-view";
 import { Panel } from "@/components/ui/panel";
-import type { DataResponse, HoldingPlan } from "@/lib/api/types";
+import type { DataResponse, HoldingPlan, SectorTrend } from "@/lib/api/types";
 import { formatDate, formatNumber } from "@/lib/format";
 import type { ApiState } from "@/lib/hooks/use-api";
 
@@ -171,6 +171,8 @@ export function HoldingPlanPanel({
                 </div>
               </div>
 
+              <ContextRow plan={plan} />
+
               {plan.warnings.length > 0 && (
                 <ul className="space-y-2">
                   {plan.warnings.map((warning) => (
@@ -195,5 +197,60 @@ export function HoldingPlanPanel({
         }}
       </DataView>
     </Panel>
+  );
+}
+
+const DIRECTION: Record<SectorTrend["direction"], { text: string; tone: string }> = {
+  up: { text: "Uptrend", tone: "text-positive" },
+  down: { text: "Downtrend", tone: "text-negative" },
+  mixed: { text: "No clear trend", tone: "text-warning" },
+};
+
+function ContextRow({ plan }: { plan: HoldingPlan }) {
+  if (plan.context.length === 0 && plan.context_missing.length === 0) return null;
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-faint">
+        Sector{plan.context.some((t) => t.kind === "oil") || plan.context_missing.includes("USO") ? " and oil" : ""} right now
+      </h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {plan.context.map((t) => {
+          const d = DIRECTION[t.direction];
+          return (
+            <div key={t.symbol} className="rounded-md border border-line p-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm text-ink">{t.label}</span>
+                <span className={`text-sm font-medium ${d.tone}`}>{d.text}</span>
+              </div>
+              <dl className="mt-2 grid grid-cols-3 gap-2 font-mono text-xs">
+                <div>
+                  <dt className="font-sans text-ink-faint">vs 50-day</dt>
+                  <dd className={t.vs_sma_50 >= 0 ? "text-positive" : "text-negative"}>{pct(t.vs_sma_50)}</dd>
+                </div>
+                <div>
+                  <dt className="font-sans text-ink-faint">1 month</dt>
+                  <dd className={(t.return_1m ?? 0) >= 0 ? "text-positive" : "text-negative"}>{pct(t.return_1m)}</dd>
+                </div>
+                <div>
+                  <dt className="font-sans text-ink-faint">3 months</dt>
+                  <dd className={(t.return_3m ?? 0) >= 0 ? "text-positive" : "text-negative"}>{pct(t.return_3m)}</dd>
+                </div>
+              </dl>
+              {t.stock_vs_1m !== null && (
+                <p className="mt-2 text-xs text-ink-muted">
+                  {plan.ticker} vs this over 1 month: {pct(t.stock_vs_1m)}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {plan.context_missing.length > 0 && (
+        <p className="mt-2 text-xs text-ink-muted">
+          Prices for {plan.context_missing.join(" and ")} are not loaded yet. Click Calculate score
+          to load them (they refresh at most every 6 hours).
+        </p>
+      )}
+    </div>
   );
 }

@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.analysis import sector
 from app.analysis.holding import plan_status
 from app.analysis.performance import HORIZONS, Bar, call_performance, summary
 from app.core.errors import ConflictError, NotFoundError
@@ -181,15 +182,19 @@ def update_prices(
             UnavailableReason.PROVIDER_NOT_CONFIGURED,
             "Updating prices needs a market data provider, and none is configured.",
         )
-    tickers = sorted(
-        set(
-            db.scalars(
-                select(Stock.ticker).join(Recommendation, Recommendation.stock_id == Stock.id)
-            )
+    tracked = db.execute(
+        select(Stock.ticker, Stock.sic_code).join(
+            Recommendation, Recommendation.stock_id == Stock.id
         )
+    ).all()
+    tickers = sorted({ticker for ticker, _ in tracked})
+    # Sector and oil ETFs, so the holding plans' warnings stay current.
+    context = sorted(
+        {symbol for _, sic in tracked for symbol, _l, _k in sector.context_symbols(sic)}
+        - set(BENCHMARKS)
     )
     results = []
-    for ticker in [*tickers, *BENCHMARKS]:
+    for ticker in [*tickers, *BENCHMARKS, *context]:
         result = ingestion.sync_prices(db, market, ticker, history_years=history_years)
         if result.status == DataStatus.OK and result.data:
             results.append(

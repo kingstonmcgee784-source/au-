@@ -21,7 +21,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from app.analysis import technical
+from app.analysis import sector, technical
 
 HOLD_DAYS = 91  # about 3 months
 CHECK_IN_DAYS = 30  # about 1 month
@@ -193,6 +193,7 @@ def build_plan(
     category_ratings: Mapping[str, float | None],
     relative_strength_6m: float | None,
     next_earnings: date | None,
+    trends: Sequence[sector.Trend] = (),
 ) -> dict[str, object] | None:
     """The plan from bars sorted oldest first, or None with too little history."""
     if len(bars) < MIN_BARS:
@@ -207,8 +208,22 @@ def build_plan(
     stop_pct, target_pct = -levels[0], levels[1]
     sma50 = technical.sma(closes, 50)[-1]
     checks = fit_checks(closes, relative_strength_6m)
+    for t in trends:
+        what = "Oil price" if t.kind == "oil" else t.label
+        relative = (
+            f" The stock did {t.stock_vs_1m * 100:+.1f} points vs it over the last month."
+            if t.stock_vs_1m is not None
+            else ""
+        )
+        checks.append(
+            Check(
+                f"{what} trending up",
+                t.direction == "up",
+                f"{t.label}: {sector.describe(t)}{relative}",
+            )
+        )
 
-    warnings: list[str] = []
+    warnings: list[str] = sector.warnings(trends)
     ends = today + timedelta(days=HOLD_DAYS)
     if next_earnings and today <= next_earnings <= ends:
         days = (next_earnings - today).days
@@ -247,6 +262,7 @@ def build_plan(
         "checks": checks,
         "driver": score_driver(category_ratings),
         "warnings": warnings,
+        "context": list(trends),
     }
 
 

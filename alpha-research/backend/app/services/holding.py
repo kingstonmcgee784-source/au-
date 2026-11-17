@@ -1,15 +1,17 @@
 """The holding plan for a stock, from stored prices and its latest score."""
 
+from dataclasses import asdict
 from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.analysis import sector
 from app.analysis.holding import PriceBar, build_plan, stop_and_target
 from app.analysis.scoring import CATEGORIES
 from app.models import FinancialMetric, HistoricalPrice, StockScore
 from app.schemas.common import DataResponse, DataStatus, UnavailableReason, ok, unavailable
-from app.schemas.stocks import HoldingPlan, PlanCheck
+from app.schemas.stocks import HoldingPlan, PlanCheck, SectorTrend
 from app.services import catalysts
 from app.services.stocks import LOCAL_SOURCE, find_stock, no_stored_stock
 
@@ -52,8 +54,12 @@ def get_plan(db: Session, ticker: str) -> DataResponse[HoldingPlan]:
     next_earnings = (
         feed.data.next_earnings_estimate if feed.status == DataStatus.OK and feed.data else None
     )
+    trends, missing = context_trends(
+        db, stock.sic_code, [b.adjusted_close or b.close for b in bars]
+    )
     plan = build_plan(
         bars,
+        trends=trends,
         today=datetime.now(UTC).date(),
         category_ratings=ratings,
         relative_strength_6m=relative_strength,
@@ -68,10 +74,13 @@ def get_plan(db: Session, ticker: str) -> DataResponse[HoldingPlan]:
     checks = [
         PlanCheck(label=c.label, passed=c.passed, detail=c.detail) for c in plan.pop("checks")
     ]
+    context = [SectorTrend(**asdict(t)) for t in plan.pop("context")]
     return ok(
         HoldingPlan(
             ticker=ticker,
             checks=checks,
+            context=context,
+            context_missing=missing,
             score=score.total_score if score else None,
             **plan,
         ),
@@ -96,3 +105,30 @@ def levels_as_of(db: Session, stock_id: int, as_of: date) -> tuple[float, float]
     ).all()
     bars = [PriceBar(r.date, r.high, r.low, r.close, r.adjusted_close) for r in reversed(rows)]
     return stop_and_target(bars)
+
+
+def context_trends(
+    db: Session, sic: str | None, stock_closes: list[float]
+) -> tuple[list[sector.Trend], list[str]]:
+    """Sector and oil trends from stored ETF prices, and the ETFs not stored yet."""
+    trends: list[sector.Trend] = []
+    missing: list[str] = []
+    for symbol, label, kind in sector.context_symbols(sic):
+        etf = find_stock(db, symbol)
+        rows = (
+            db.scalars(
+                select(HistoricalPrice)
+                .where(HistoricalPrice.stock_id == etf.id)
+                .order_by(HistoricalPrice.date.desc())
+                .limit(MAX_BARS)
+            ).all()
+            if etf
+            else []
+        )
+        closes = [r.adjusted_close or r.close for r in reversed(rows)]
+        t = sector.trend(symbol, label, kind, closes, stock_closes)
+        if t is None:
+            missing.append(symbol)
+        else:
+            trends.append(t)
+    return trends, missing

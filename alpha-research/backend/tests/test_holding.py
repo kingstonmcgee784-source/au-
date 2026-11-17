@@ -201,3 +201,52 @@ def test_older_calls_get_a_plan_from_call_date_prices(
     tracked = client.get("/api/v1/recommendations").json()["calls"][0]
     assert tracked["stop_pct"] == pytest.approx(call["stop_pct"])
     assert tracked["plan_status"] == "open"
+
+
+# -- Sector and oil context -------------------------------------------------------
+
+
+def test_context_symbols_by_industry_code() -> None:
+    from app.analysis.sector import context_symbols
+
+    assert [s for s, _, _ in context_symbols("1311")] == ["XLE", "USO"]  # oil producer
+    assert [s for s, _, _ in context_symbols("2834")] == ["XLV"]  # drugs, not chemicals
+    assert [s for s, _, _ in context_symbols("6798")] == ["XLRE"]  # REIT, not finance
+    assert [s for s, _, _ in context_symbols("7372")] == ["XLK"]
+    assert context_symbols(None) == [] and context_symbols("9999") == []
+
+
+def test_falling_oil_is_a_failed_check_and_a_warning() -> None:
+    from app.analysis.sector import trend
+
+    oil = [100 - 0.3 * i for i in range(120)]  # steady fall
+    stock = [b.close for b in wavy(250, 1.0)]
+    t = trend("USO", "Crude oil (USO)", "oil", oil, stock)
+    assert t is not None and t.direction == "down"
+    plan = build_plan(
+        wavy(250, 1.0),
+        today=D0 + timedelta(days=250),
+        category_ratings={},
+        relative_strength_6m=None,
+        next_earnings=None,
+        trends=[t],
+    )
+    assert plan is not None
+    oil_check = next(c for c in plan["checks"] if c.label == "Oil price trending up")
+    assert not oil_check.passed
+    assert any(w.startswith("Oil is falling") for w in plan["warnings"])
+
+
+def test_plan_reports_missing_sector_prices(
+    client: TestClient,
+    market,  # noqa: F811
+    db: Session,
+) -> None:
+    scored_stock(db, market)  # SIC 7372; the fake market has no XLK prices
+    plan = client.get("/api/v1/stocks/TEST/holding-plan").json()["data"]
+    assert plan["context_missing"] == ["XLK"]
+    market.known["XLK"] = market.known["SPY"]
+    scored_stock(db, market)
+    plan = client.get("/api/v1/stocks/TEST/holding-plan").json()["data"]
+    assert [c["symbol"] for c in plan["context"]] == ["XLK"]
+    assert any(c["label"].startswith("Technology stocks") for c in plan["checks"])
