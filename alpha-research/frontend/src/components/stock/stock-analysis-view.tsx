@@ -16,6 +16,7 @@ import {
 import { useApi } from "@/lib/hooks/use-api";
 
 import { IndustryPanel } from "./industry-panel";
+import { ScoreBreakdownPanel } from "./score-breakdown";
 import { InsiderPanel } from "./insider-panel";
 import { CalculateScoreButton, MetricsPanel, ScorePanel, TrackCallButton } from "./score-panels";
 import { TickerForm, useTickerParam } from "./ticker-form";
@@ -63,6 +64,7 @@ function TickerResearch({ ticker }: { ticker: string }) {
         <QuotePanel ticker={ticker} />
         <ScorePanel state={score.state} onRetry={score.reload} />
       </div>
+      <ScoreBreakdownPanel ticker={ticker} state={score.state} onRetry={score.reload} />
       <MetricsPanel state={metrics.state} onRetry={metrics.reload} />
       <IndustryPanel state={industry.state} onRetry={industry.reload} />
       <InsiderPanel

@@ -10,6 +10,7 @@ Steps (each in its own layer):
 """
 
 import logging
+from dataclasses import asdict
 from datetime import UTC, date, datetime
 
 from sqlalchemy import select
@@ -106,6 +107,9 @@ def score_stock(
     details: dict[str, object] = {
         key: {
             "inputs": rating.used,
+            "breakdown": [asdict(b) for b in rating.breakdown],
+            "missing": rating.missing,
+            "minimum": rating.minimum,
             "unrated_reason": None
             if rating.rating is not None
             else UNRATED_REASON.get(key, "Not enough data for this category."),

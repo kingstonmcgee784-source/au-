@@ -128,6 +128,18 @@ export interface ScoringMethodology {
   bands: { min_score: number; label: string }[];
 }
 
+export interface ScoreInput {
+  metric: string;
+  label: string;
+  value: number | null;
+  /** Formatted value, e.g. "24.6×"; null for scores saved before breakdowns. */
+  value_text: string | null;
+  /** 0-1 */
+  rating: number;
+  /** e.g. "Full marks at 10.0× or lower; zero at 60.0× or higher" */
+  scale: string | null;
+}
+
 export interface CategoryScore {
   key: string;
   label: string;
@@ -136,6 +148,10 @@ export interface CategoryScore {
   points: number | null;
   /** Sub-rating label -> rating (0-1) for the inputs that had data. */
   inputs: Record<string, number>;
+  breakdown: ScoreInput[];
+  /** Inputs that had no data. */
+  missing: string[];
+  minimum_inputs: number;
   unrated_reason: string | null;
 }
 

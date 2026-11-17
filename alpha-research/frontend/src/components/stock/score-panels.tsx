@@ -58,7 +58,10 @@ export function ScorePanel({
               Based on {Math.round(score.coverage * 100)}% of the methodology. Categories without
               data are left out, not counted as zero.
             </p>
-            <ul className="mt-4 space-y-2.5">
+            <p className="mt-3 text-[11px] text-ink-faint">
+              Click a category to see every input behind it in the Score breakdown below.
+            </p>
+            <ul className="mt-2 space-y-2.5">
               {score.categories.map((category) => (
                 <CategoryRow key={category.key} category={category} />
               ))}
@@ -82,7 +85,12 @@ function CategoryRow({ category }: { category: CategoryScore }) {
   return (
     <li title={rated ? inputs.map(([k, v]) => `${k}: ${Math.round(v * 100)}%`).join("\n") : undefined}>
       <div className="flex justify-between gap-3 text-xs">
-        <span className={rated ? "text-ink-muted" : "text-ink-faint"}>{category.label}</span>
+        <a
+          href={`#breakdown-${category.key}`}
+          className={`hover:text-accent hover:underline ${rated ? "text-ink-muted" : "text-ink-faint"}`}
+        >
+          {category.label}
+        </a>
         <span className="font-mono text-ink">
           {rated ? (
             <>
@@ -192,7 +200,7 @@ export function MetricsPanel({
   onRetry: () => void;
 }) {
   return (
-    <Panel title="Key metrics" icon={Calculator}>
+    <Panel id="key-metrics" title="Key metrics" icon={Calculator}>
       <DataView state={state} onRetry={onRetry}>
         {(snapshot, response) => (
           <>

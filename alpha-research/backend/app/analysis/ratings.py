@@ -14,7 +14,7 @@ nearest end point.
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.analysis.metrics import Metrics
 
@@ -206,22 +206,127 @@ UNRATED_REASON = {
 
 
 @dataclass(frozen=True)
+class InputRating:
+    """One input to a category: its value, its rating and the scale used."""
+
+    metric: str
+    label: str
+    value: float
+    value_text: str
+    rating: float
+    scale: str
+
+
+@dataclass(frozen=True)
 class CategoryRating:
     rating: float | None
     used: dict[str, float]  # sub-rating label -> rating, for the inputs that had data
+    breakdown: list[InputRating] = field(default_factory=list)
+    missing: list[str] = field(default_factory=list)  # inputs without data
+    minimum: int = 1  # inputs needed to rate the category
 
 
 def rate(metrics: Metrics) -> dict[str, CategoryRating]:
     out: dict[str, CategoryRating] = {}
     for key, (minimum, subs) in CATEGORY_RULES.items():
-        used = {
-            sub.label: round(interpolate(value, sub.curve), 3)
-            for sub in subs
-            if (value := metrics.get(sub.metric)) is not None
-        }
+        breakdown: list[InputRating] = []
+        missing: list[str] = []
+        for sub in subs:
+            value = metrics.get(sub.metric)
+            if value is None:
+                missing.append(sub.label)
+                continue
+            breakdown.append(
+                InputRating(
+                    metric=sub.metric,
+                    label=sub.label,
+                    value=value,
+                    value_text=format_value(sub.metric, value),
+                    rating=round(interpolate(value, sub.curve), 3),
+                    scale=describe_scale(sub.metric, sub.curve),
+                )
+            )
+        used = {b.label: b.rating for b in breakdown}
         rating = sum(used.values()) / len(used) if subs and len(used) >= minimum else None
-        out[key] = CategoryRating(rating=rating, used=used)
+        out[key] = CategoryRating(
+            rating=rating, used=used, breakdown=breakdown, missing=missing, minimum=minimum
+        )
     return out
+
+
+# How each metric is shown. Anything not listed is a plain ratio.
+UNITS: dict[str, str] = {
+    "operating_margin": "percent",
+    "fcf_margin": "percent",
+    "roe": "percent",
+    "share_change_yoy": "percent",
+    "fcf_yield": "percent",
+    "price_vs_sma200": "percent",
+    "relative_strength_6m": "percent",
+    "revenue_growth_yoy": "percent",
+    "revenue_growth_ttm": "percent",
+    "net_income_growth_ttm": "percent",
+    "revenue_acceleration": "points",
+    "volatility_1y": "percent",
+    "max_drawdown_1y": "percent",
+    "from_52w_high": "percent",
+    "insider_discretionary_sales_to_market_cap": "percent",
+    "pe_ttm": "multiple",
+    "ev_to_ebitda": "multiple",
+    "price_to_sales": "multiple",
+    "sma50_above_sma200": "yesno",
+    "rsi_14": "number",
+    "insider_buyers": "count",
+    "catalyst_red_flags_365d": "count",
+    "catalyst_material_events_180d": "count",
+    "catalyst_earnings_within_90d": "yesno",
+}
+
+
+def format_value(metric: str, value: float) -> str:
+    unit = "percentile" if metric.startswith("industry_pct_") else UNITS.get(metric, "ratio")
+    if unit == "percent":
+        return f"{value * 100:.1f}%"
+    if unit == "points":
+        return f"{value * 100:+.1f} pts"
+    if unit == "multiple":
+        return f"{value:.1f}×"
+    if unit == "count":
+        return f"{value:.0f}"
+    if unit == "yesno":
+        return "Yes" if value >= 0.5 else "No"
+    if unit == "percentile":
+        return f"better than {value * 100:.0f}% of peers"
+    if unit == "number":
+        return f"{value:.0f}"
+    return f"{value:.2f}"
+
+
+def describe_scale(metric: str, curve: Curve) -> str:
+    """Plain-language summary of a threshold table, e.g. 'Full marks at 10.0× or lower'."""
+    points = sorted(curve)
+    top = max(y for _, y in points)
+    low = min(y for _, y in points)
+    best = [x for x, y in points if y == top]
+    worst = [x for x, y in points if y == low]
+    fmt = lambda x: format_value(metric, x)  # noqa: E731
+
+    def where(xs: list[float], is_top: bool) -> str:
+        if len(xs) > 1:
+            return f"between {fmt(xs[0])} and {fmt(xs[-1])}"
+        x = xs[0]
+        if x == points[0][0]:
+            return f"at {fmt(x)} or lower"
+        if x == points[-1][0]:
+            return f"at {fmt(x)} or higher"
+        return f"at {fmt(x)}"
+
+    full = "Full marks" if top == 1.0 else f"Best ({top * 100:.0f}%)"
+    if UNITS.get(metric) == "yesno":
+        answer = "Yes" if points[-1][1] == top else "No"
+        return f"{full} for {answer}, {low * 100:.0f}% otherwise"
+    bottom = "zero" if low == 0.0 else f"lowest ({low * 100:.0f}%)"
+    return f"{full} {where(best, True)}; {bottom} {where(worst, False)}"
 
 
 def risk_class(metrics: Metrics) -> str | None:

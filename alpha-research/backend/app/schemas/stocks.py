@@ -99,12 +99,26 @@ class RankingEntry(BaseModel):
     as_of: date
 
 
+class ScoreInput(BaseModel):
+    """One input to a category score."""
+
+    metric: str
+    label: str
+    value: float | None
+    value_text: str | None  # e.g. "24.6×"; None for scores saved before breakdowns
+    rating: float  # 0-1
+    scale: str | None  # e.g. "Full marks at 10.0× or lower; zero at 60.0× or higher"
+
+
 class CategoryScore(BaseModel):
     key: str
     label: str
     weight: float
     points: float | None  # None when the category could not be rated
     inputs: dict[str, float]  # sub-rating label -> rating (0-1) for inputs that had data
+    breakdown: list[ScoreInput]
+    missing: list[str]  # inputs that had no data
+    minimum_inputs: int  # inputs needed to rate the category
     unrated_reason: str | None
 
 

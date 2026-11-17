@@ -118,6 +118,11 @@ def test_calculate_score_end_to_end(client: TestClient, providers: FakeProvider)
     for key in ("fundamentals", "valuation", "technical", "growth", "risk_reward"):
         assert categories[key]["points"] is not None, key
         assert categories[key]["inputs"], key
+        for item in categories[key]["breakdown"]:
+            assert item["value_text"] and item["scale"], item
+    pe = next(i for i in categories["valuation"]["breakdown"] if i["metric"] == "pe_ttm")
+    assert pe["value_text"].endswith("×")
+    assert pe["scale"] == "Full marks at 10.0× or lower; zero at 60.0× or higher"
     assert 0 <= score["total_score"] <= 100
     assert score["risk_class"] in {"Low", "Moderate", "Elevated", "High", "Speculative"}
     assert "Not scored for lack of data" in score["notes"]

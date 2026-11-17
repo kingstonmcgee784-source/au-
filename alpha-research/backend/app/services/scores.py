@@ -10,6 +10,7 @@ from app.schemas.stocks import (
     CategoryScore,
     RankingEntry,
     ScoreCategory,
+    ScoreInput,
     ScoringMethodology,
     StockScoreOut,
 )
@@ -32,13 +33,29 @@ def score_out(ticker: str, row: StockScore) -> StockScoreOut:
     for category in scoring.CATEGORIES:
         detail = details.get(category.key)
         detail = detail if isinstance(detail, dict) else {}
+        inputs = detail.get("inputs") or {}
+        # Scores saved before breakdowns existed only have label -> rating.
+        breakdown = detail.get("breakdown") or [
+            {
+                "metric": label,
+                "label": label,
+                "value": None,
+                "value_text": None,
+                "rating": rating,
+                "scale": None,
+            }
+            for label, rating in inputs.items()
+        ]
         categories.append(
             CategoryScore(
                 key=category.key,
                 label=category.label,
                 weight=category.weight,
                 points=row.category_scores.get(category.key),
-                inputs=detail.get("inputs") or {},
+                inputs=inputs,
+                breakdown=[ScoreInput.model_validate(b) for b in breakdown],
+                missing=detail.get("missing") or [],
+                minimum_inputs=detail.get("minimum") or 1,
                 unrated_reason=detail.get("unrated_reason"),
             )
         )

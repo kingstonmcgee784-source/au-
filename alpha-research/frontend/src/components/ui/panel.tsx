@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 interface PanelProps {
   title: string;
+  id?: string;
   icon?: LucideIcon;
   actions?: ReactNode;
   footer?: ReactNode;
@@ -11,10 +12,19 @@ interface PanelProps {
 }
 
 /** The standard bordered card used for every dashboard section. */
-export function Panel({ title, icon: Icon, actions, footer, className = "", children }: PanelProps) {
+export function Panel({
+  title,
+  id,
+  icon: Icon,
+  actions,
+  footer,
+  className = "",
+  children,
+}: PanelProps) {
   return (
     <section
-      className={`flex min-w-0 flex-col rounded-lg border border-line bg-surface ${className}`}
+      id={id}
+      className={`flex min-w-0 scroll-mt-20 flex-col rounded-lg border border-line bg-surface ${className}`}
     >
       <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
         <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">
