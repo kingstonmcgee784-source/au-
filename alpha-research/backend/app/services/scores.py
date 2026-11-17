@@ -68,7 +68,7 @@ def score_out(
                 breakdown=[ScoreInput.model_validate(b) for b in breakdown],
                 missing=missing,
                 minimum_inputs=ratings.CATEGORY_RULES[category.key][0],
-                summary=ratings.category_summary(breakdown),
+                summary=_with_adjustment(ratings.category_summary(breakdown), detail),
                 unrated_reason=detail.get("unrated_reason"),
             )
         )
@@ -157,3 +157,11 @@ def get_latest_score(db: Session, ticker: str) -> DataResponse[StockScoreOut]:
         )
     }
     return ok(score_out(ticker, score, metrics), source=LOCAL_SOURCE, as_of=score.calculated_at)
+
+
+def _with_adjustment(summary: str | None, detail: Mapping[str, object]) -> str | None:
+    """Add the reason a category was adjusted after its inputs were rated."""
+    adjustment = detail.get("adjustment")
+    if not isinstance(adjustment, dict) or not adjustment.get("note"):
+        return summary
+    return f"{summary} {adjustment['note']}" if summary else str(adjustment["note"])

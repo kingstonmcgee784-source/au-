@@ -10,16 +10,16 @@ Steps (each in its own layer):
 """
 
 import logging
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.analysis import scoring, sector
+from app.analysis import commodity, scoring, sector
 from app.analysis.metrics import Metrics, Period, PricePoint, compute_metrics
 from app.analysis.ratings import UNRATED_REASON, rate, risk_class
-from app.models import FinancialMetric, FinancialStatement, HistoricalPrice, StockScore
+from app.models import FinancialMetric, FinancialStatement, HistoricalPrice, Stock, StockScore
 from app.providers.base import FundamentalsSource, MarketDataProvider
 from app.schemas.common import DataResponse, DataStatus, UnavailableReason, ok, unavailable
 from app.schemas.stocks import MetricsSnapshot, StockScoreOut
@@ -119,6 +119,11 @@ def score_stock(
             f"Not enough data to score {ticker}: {needs}. " + " ".join(warnings),
         )
 
+    adjustments, oil_note = _oil_adjustment(db, stock, as_of, metrics)
+    for key, multiplier in adjustments.items():
+        if ratings[key].rating is not None:
+            ratings[key] = replace(ratings[key], rating=ratings[key].rating * multiplier)
+
     total, points, coverage = scoring.partial_score({k: r.rating for k, r in ratings.items()})
     details: dict[str, object] = {
         key: {
@@ -129,6 +134,11 @@ def score_stock(
             "unrated_reason": None
             if rating.rating is not None
             else UNRATED_REASON.get(key, "Not enough data for this category."),
+            "adjustment": (
+                {"multiplier": adjustments[key], "note": oil_note}
+                if key in adjustments and rating.rating is not None
+                else None
+            ),
         }
         for key, rating in ratings.items()
     }
@@ -149,6 +159,8 @@ def score_stock(
             " Catalysts reflect SEC 8-K event types and an estimated earnings date; they cannot"
             " judge the size of a contract or the outcome of earnings."
         )
+    if oil_note:
+        notes += f" Oil adjustment: {oil_note}" if adjustments else f" {oil_note}"
     if warnings:
         notes += " " + " ".join(warnings)
 
@@ -251,3 +263,37 @@ def _store_metrics(db: Session, stock_id: int, as_of: date, metrics: Metrics) ->
         row.period = "TTM / latest"
         row.data_kind = "calculated"
         row.retrieved_at = now
+
+
+def _oil_adjustment(
+    db: Session, stock: Stock, as_of: date, metrics: Metrics
+) -> tuple[dict[str, float], str | None]:
+    """Multipliers for the categories that lag the oil price, for oil and gas
+    companies only (see app.analysis.commodity), and a note explaining them."""
+    if not (stock.sic_code or "").startswith(sector.OIL_PREFIXES):
+        return {}, None
+    oil = find_stock(db, sector.OIL[0])
+    closes = (
+        [
+            adj if adj is not None else close
+            for close, adj in db.execute(
+                select(HistoricalPrice.close, HistoricalPrice.adjusted_close)
+                .where(HistoricalPrice.stock_id == oil.id, HistoricalPrice.date <= as_of)
+                .order_by(HistoricalPrice.date.desc())
+                .limit(commodity.QUARTER)
+            ).all()
+        ][::-1]
+        if oil
+        else []
+    )
+    gap = commodity.oil_gap(closes)
+    metrics["oil_vs_quarter_avg"] = gap
+    if gap is None:
+        return {}, (
+            "Oil prices (USO) are not loaded yet, so no oil adjustment was applied; "
+            "calculate the score again once they load."
+        )
+    multiplier = commodity.factor(gap)
+    if multiplier >= 1.0:
+        return {}, None
+    return {key: multiplier for key in commodity.ADJUSTED}, commodity.note(gap, multiplier)
