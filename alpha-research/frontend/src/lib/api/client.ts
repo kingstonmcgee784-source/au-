@@ -8,6 +8,7 @@
 
 import type {
   HoldingPlan,
+  MarketConditions,
   IndustryComparison,
   Scan,
   ScreenerRow,
@@ -94,6 +95,9 @@ export const api = {
   health: () => request<HealthResponse>("/health"),
 
   marketOverview: () => request<DataResponse<MarketOverview>>("/market/overview"),
+  marketConditions: () => request<DataResponse<MarketConditions>>("/market/conditions"),
+  refreshMarketConditions: () =>
+    request<DataResponse<MarketConditions>>("/market/conditions/refresh", { method: "POST" }),
 
   searchStocks: (query: string, limit = 20) =>
     request<DataResponse<StockSummary[]>>(

@@ -13,6 +13,7 @@ from app.models import FinancialMetric, HistoricalPrice, StockScore
 from app.schemas.common import DataResponse, DataStatus, UnavailableReason, ok, unavailable
 from app.schemas.stocks import HoldingPlan, PlanCheck, SectorTrend
 from app.services import catalysts
+from app.services import market as market_gauges
 from app.services.stocks import LOCAL_SOURCE, find_stock, no_stored_stock
 
 MAX_BARS = 300
@@ -57,9 +58,12 @@ def get_plan(db: Session, ticker: str) -> DataResponse[HoldingPlan]:
     trends, missing = context_trends(
         db, stock.sic_code, [b.adjusted_close or b.close for b in bars]
     )
+    conditions = market_gauges.conditions(db)
     plan = build_plan(
         bars,
         trends=trends,
+        market_level=conditions.level if conditions.gauges else None,
+        market_warning=conditions.warning,
         today=datetime.now(UTC).date(),
         category_ratings=ratings,
         relative_strength_6m=relative_strength,
@@ -81,6 +85,7 @@ def get_plan(db: Session, ticker: str) -> DataResponse[HoldingPlan]:
             checks=checks,
             context=context,
             context_missing=missing,
+            market=conditions if conditions.gauges else None,
             score=score.total_score if score else None,
             **plan,
         ),

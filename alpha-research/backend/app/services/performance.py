@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.analysis import market as market_gauges
 from app.analysis import sector
 from app.analysis.holding import plan_status
 from app.analysis.performance import HORIZONS, Bar, call_performance, summary
@@ -192,8 +193,9 @@ def update_prices(
     # Sector and oil ETFs, so the holding plans' warnings stay current.
     context = sorted(
         {symbol for _, sic in tracked for symbol, _l, _k in sector.context_symbols(sic)}
-        - set(BENCHMARKS)
+        | set(market_gauges.SYMBOLS)
     )
+    context = [s for s in context if s not in BENCHMARKS]
     results = []
     limited = False
     for ticker in [*tickers, *BENCHMARKS, *context]:

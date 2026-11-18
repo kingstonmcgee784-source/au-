@@ -272,4 +272,29 @@ class HoldingPlan(BaseModel):
     context: list[SectorTrend] = []
     # Sector or oil ETFs this stock is matched to whose prices are not stored yet.
     context_missing: list[str] = []
+    market: "MarketConditions | None" = None
     score: float | None
+
+
+class MarketGauge(BaseModel):
+    key: str
+    label: str
+    # calm | caution | stress
+    level: str
+    value: float
+    summary: str
+
+
+class MarketConditions(BaseModel):
+    """Market-wide stress gauges from ETF prices (see app.analysis.market)."""
+
+    # calm | caution | stress | unknown
+    level: str
+    gauges: list[MarketGauge]
+    warning: str | None
+    as_of: date | None
+    # ETFs whose prices are not stored yet.
+    missing: list[str]
+
+
+HoldingPlan.model_rebuild()

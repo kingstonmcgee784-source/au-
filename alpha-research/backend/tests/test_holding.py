@@ -250,3 +250,19 @@ def test_plan_reports_missing_sector_prices(
     plan = client.get("/api/v1/stocks/TEST/holding-plan").json()["data"]
     assert [c["symbol"] for c in plan["context"]] == ["XLK"]
     assert any(c["label"].startswith("Technology stocks") for c in plan["checks"])
+
+
+def test_market_stress_is_a_failed_check_and_a_warning() -> None:
+    plan = build_plan(
+        wavy(250, 1.0),
+        today=D0 + timedelta(days=250),
+        category_ratings={},
+        relative_strength_6m=None,
+        next_earnings=None,
+        market_level="stress",
+        market_warning="The whole market is under stress: test.",
+    )
+    assert plan is not None
+    check = next(c for c in plan["checks"] if c.label == "Whole market not under stress")
+    assert not check.passed
+    assert plan["warnings"][0].startswith("The whole market is under stress")

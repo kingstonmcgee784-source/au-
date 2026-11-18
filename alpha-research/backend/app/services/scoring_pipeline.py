@@ -24,6 +24,7 @@ from app.providers.base import FundamentalsSource, MarketDataProvider
 from app.schemas.common import DataResponse, DataStatus, UnavailableReason, ok, unavailable
 from app.schemas.stocks import MetricsSnapshot, StockScoreOut
 from app.services import catalysts, industry, ingestion, insiders
+from app.services import market as market_gauges
 from app.services.scores import score_out
 from app.services.stocks import LOCAL_SOURCE, find_stock
 
@@ -76,6 +77,8 @@ def score_stock(
         # Sector and oil ETFs for the holding plan (each refreshed at most every 6 hours).
         for symbol, _label, _kind in sector.context_symbols(stock.sic_code):
             ingestion.sync_prices(db, market, symbol, history_years=history_years)
+        # Market-wide gauges for the holding plan.
+        market_gauges.sync(db, market, history_years=history_years)
     if stock is None:
         detail = " ".join(warnings) or f"{ticker} has no stored data."
         return unavailable(UnavailableReason.NO_STORED_DATA, f"Cannot score {ticker}. {detail}")

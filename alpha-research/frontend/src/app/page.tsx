@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { MarketConditionsPanel } from "@/components/dashboard/market-conditions";
 import { MarketOverviewPanel } from "@/components/dashboard/market-overview";
 import { RankingsPanel } from "@/components/dashboard/rankings-table";
 import { RecentResearchPanel } from "@/components/dashboard/recent-research";
@@ -17,6 +18,7 @@ export default function OverviewPage() {
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
           <MarketOverviewPanel />
+          <MarketConditionsPanel />
           <RankingsPanel />
         </div>
         <div className="space-y-4">

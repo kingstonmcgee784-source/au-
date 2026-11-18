@@ -194,6 +194,8 @@ def build_plan(
     relative_strength_6m: float | None,
     next_earnings: date | None,
     trends: Sequence[sector.Trend] = (),
+    market_level: str | None = None,
+    market_warning: str | None = None,
 ) -> dict[str, object] | None:
     """The plan from bars sorted oldest first, or None with too little history."""
     if len(bars) < MIN_BARS:
@@ -223,7 +225,20 @@ def build_plan(
             )
         )
 
-    warnings: list[str] = sector.warnings(trends)
+    if market_level in ("calm", "caution", "stress"):
+        checks.append(
+            Check(
+                "Whole market not under stress",
+                market_level != "stress",
+                {
+                    "calm": "Market gauges are calm: trend, fear, interest rates and credit.",
+                    "caution": "Market gauges call for caution, but not stress.",
+                    "stress": "Two or more market gauges show stress.",
+                }[market_level],
+            )
+        )
+
+    warnings: list[str] = ([market_warning] if market_warning else []) + sector.warnings(trends)
     ends = today + timedelta(days=HOLD_DAYS)
     if next_earnings and today <= next_earnings <= ends:
         days = (next_earnings - today).days

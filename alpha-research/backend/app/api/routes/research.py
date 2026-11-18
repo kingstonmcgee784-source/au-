@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import DbSession, MarketData, Writer
+from app.api.deps import AppSettings, DbSession, MarketData, Writer
 from app.schemas.common import DataResponse
 from app.schemas.research import (
     GenerateReportRequest,
@@ -12,8 +12,8 @@ from app.schemas.research import (
     ResearchReportOut,
     ResearchReportSummary,
 )
-from app.schemas.stocks import RankingEntry, ScoringMethodology
-from app.services import research, scores
+from app.schemas.stocks import MarketConditions, RankingEntry, ScoringMethodology
+from app.services import market, research, scores
 
 router = APIRouter()
 
@@ -33,6 +33,24 @@ def rankings(
 @router.get("/market/overview", response_model=DataResponse[MarketOverview], tags=["market"])
 def market_overview(provider: MarketData) -> DataResponse[MarketOverview]:
     return research.market_overview(provider)
+
+
+@router.get("/market/conditions", response_model=DataResponse[MarketConditions], tags=["market"])
+def market_conditions(db: DbSession) -> DataResponse[MarketConditions]:
+    """Market-wide stress gauges (trend, fear, rates, credit) from stored ETF prices."""
+    return market.get_conditions(db)
+
+
+@router.post(
+    "/market/conditions/refresh",
+    response_model=DataResponse[MarketConditions],
+    tags=["market"],
+)
+def refresh_market_conditions(
+    db: DbSession, provider: MarketData, settings: AppSettings
+) -> DataResponse[MarketConditions]:
+    """Load new prices for the gauge ETFs (each at most every 6 hours), then the gauges."""
+    return market.refresh(db, provider, history_years=settings.price_history_years)
 
 
 @router.get("/reports", response_model=list[ResearchReportSummary], tags=["reports"])

@@ -146,8 +146,18 @@ def test_update_prices(client: TestClient, market: FakeProvider, db: Session) ->
     client.post("/api/v1/recommendations", json={"ticker": "TEST"})
     body = client.post("/api/v1/recommendations/update-prices").json()
     assert body["status"] == "ok"
-    # The software test stock also gets its sector ETF (XLK).
-    assert [r["ticker"] for r in body["data"]["results"]] == ["TEST", "SPY", "QQQ", "IWM", "XLK"]
+    # Plus the software stock's sector ETF (XLK) and the market gauge ETFs.
+    assert [r["ticker"] for r in body["data"]["results"]] == [
+        "TEST",
+        "SPY",
+        "QQQ",
+        "IWM",
+        "HYG",
+        "IEF",
+        "TLT",
+        "VIXY",
+        "XLK",
+    ]
 
 
 def test_track_refuses_a_stale_price(client: TestClient, market: FakeProvider, db: Session) -> None:

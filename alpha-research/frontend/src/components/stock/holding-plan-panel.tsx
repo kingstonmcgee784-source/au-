@@ -2,6 +2,7 @@
 
 import { CalendarClock, Check, TriangleAlert, X } from "lucide-react";
 
+import { GaugeList, LEVEL } from "@/components/dashboard/market-conditions";
 import { DataView, SourceNote } from "@/components/ui/data-view";
 import { Panel } from "@/components/ui/panel";
 import type { DataResponse, HoldingPlan, SectorTrend } from "@/lib/api/types";
@@ -170,6 +171,18 @@ export function HoldingPlanPanel({
                   {plan.driver && <p className="mt-3 text-sm text-ink-muted">{plan.driver}</p>}
                 </div>
               </div>
+
+              {plan.market && (
+                <div>
+                  <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-faint">
+                    Whole market right now
+                    <span className={`rounded border px-1.5 py-px text-[11px] normal-case tracking-normal ${LEVEL[plan.market.level].tone}`}>
+                      {LEVEL[plan.market.level].label}
+                    </span>
+                  </h3>
+                  <GaugeList conditions={plan.market} />
+                </div>
+              )}
 
               <ContextRow plan={plan} />
 

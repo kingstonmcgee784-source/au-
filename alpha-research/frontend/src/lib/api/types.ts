@@ -391,6 +391,23 @@ export interface PlanCheck {
   detail: string;
 }
 
+export interface MarketGauge {
+  key: "trend" | "fear" | "rates" | "credit";
+  label: string;
+  level: "calm" | "caution" | "stress";
+  value: number;
+  summary: string;
+}
+
+/** Market-wide stress gauges from ETF prices. */
+export interface MarketConditions {
+  level: "calm" | "caution" | "stress" | "unknown";
+  gauges: MarketGauge[];
+  warning: string | null;
+  as_of: string | null;
+  missing: string[];
+}
+
 /** Trend of a stock's sector ETF, or of oil (USO). */
 export interface SectorTrend {
   symbol: string;
@@ -427,5 +444,6 @@ export interface HoldingPlan {
   context: SectorTrend[];
   /** Sector or oil ETFs whose prices are not stored yet. */
   context_missing: string[];
+  market: MarketConditions | null;
   score: number | null;
 }
