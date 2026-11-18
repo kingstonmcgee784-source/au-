@@ -35,8 +35,9 @@ def flat(n: int = 300, v: float = 100.0) -> list[float]:
 
 def test_calm_market() -> None:
     rising = [100 + 0.1 * i for i in range(300)]
+    bonds = [80 + 0.05 * i for i in range(300)]  # rates drifting down from their high
     found = market.gauges(
-        {"SPY": rising, "VIXY": flat(), "TLT": flat(), "HYG": flat(), "IEF": flat()}
+        {"SPY": rising, "VIXY": flat(), "TLT": bonds, "HYG": flat(), "IEF": flat()}
     )
     assert [g.level for g in found] == ["calm"] * 4
     assert market.overall(found) == "calm"
@@ -89,3 +90,22 @@ def test_conditions_endpoint_and_holding_plan(client: TestClient, db: Session) -
         assert {g["key"] for g in body["data"]["gauges"]} == {"trend", "fear", "rates", "credit"}
     finally:
         app.dependency_overrides.clear()
+
+
+def test_new_rules() -> None:
+    # A 10% fall from the high is a correction, even above the 200-day average.
+    spy = [100 + 0.2 * i for i in range(280)] + [155.8 - 0.9 * i for i in range(20)]
+    assert market.trend(spy).level == "stress"
+    # Bonds near their 1-year low: long-term rates near a 1-year high.
+    near_low = [100 - 0.05 * i for i in range(300)]
+    gauge = market.rates(flat(279) + near_low[-21:])
+    assert gauge.level in {"caution", "stress"}
+    assert (
+        "highest in a year"
+        in market.rates([100 - 0.08 * i for i in range(250)] + [80.0] * 50).summary
+    )
+    # Any caution is caution; three cautions at once are stress.
+    calm = market.Gauge("x", "x", "calm", 0, "")
+    caution = market.Gauge("y", "y", "caution", 0, "y.")
+    assert market.overall([calm, calm, calm, caution]) == "caution"
+    assert market.overall([caution, caution, caution, calm]) == "stress"

@@ -75,8 +75,9 @@ export function MarketConditionsPanel() {
                   {level.label}
                 </span>
                 <span className="text-xs text-ink-muted">
-                  Closing prices of {formatDate(conditions.as_of)}. Calm, caution or stress from four
-                  gauges; two or more in stress means the whole market is under stress.
+                  Closing prices of {formatDate(conditions.as_of)}. Calm only when all four gauges
+                  are calm. Under stress when two are in stress, one in stress and two in caution,
+                  or three in caution at once.
                 </span>
               </div>
               {conditions.warning && <MarketWarning text={conditions.warning} />}
