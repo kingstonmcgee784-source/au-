@@ -1,17 +1,17 @@
-// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0
 //@version=6
-// NQ Afternoon Momentum — one day trade per session, built for a Tradeify 50K Growth evaluation
+// NQ Globex Momentum — one day trade per session, built for a Tradeify 50K Growth evaluation
 // routed through TradersPost to Tradovate.
 //
-// Rule (picked on 2024-06..2025-12 data, checked on unseen 2025-12..2026-11 data):
-//   At 13:00 ET, if price is above the 18:00 ET Globex open -> long, below -> short.
-//   Protective stop sent with the entry. Flat at 15:58 ET. Safety flatten alert at 16:50 ET.
+// Rule: At 10:00 ET, if price is above the 18:00 ET Globex open -> long, below -> short.
+// (10:00 beat 13:00 on both the older and the unseen recent data; 13:00 lost money recently.)
+// Protective stop sent with the entry. Flat at 15:58 ET. Safety flatten alert at 16:50 ET.
+// Prop guards: stop trading once the profit target is reached; optional drawdown guard
+// (for funded accounts) that sizes down so a full stop-out never breaches the trailing drawdown.
 //
-// Chart setup: CME_MINI:MNQ1! (or NQ1!), 1- or 5-minute bars, EXTENDED HOURS ON
-// (the 18:00 Globex open is only visible with extended hours).
+// Chart setup: CME_MINI:MNQ1! (or NQ1!), 1- to 15-minute bars, EXTENDED HOURS ON.
 // Alert setup: Condition = this strategy, "Order fills and alert() function calls",
 // Message = {{strategy.order.alert_message}}, Webhook URL = your TradersPost webhook.
-strategy("NQ Afternoon Momentum", overlay = true, process_orders_on_close = true,
+strategy("NQ Globex Momentum", overlay = true, process_orders_on_close = true,
      default_qty_type = strategy.fixed, default_qty_value = 2, initial_capital = 50000,
      commission_type = strategy.commission.cash_per_contract, commission_value = 0.75,
      slippage = 2, pyramiding = 0, margin_long = 1, margin_short = 1)
@@ -21,7 +21,7 @@ strategy("NQ Afternoon Momentum", overlay = true, process_orders_on_close = true
 TZ = "America/New_York"
 
 grpS = "Strategy"
-entryHour  = input.int(13, "Entry time ET (hour)", minval = 0, maxval = 23, group = grpS, inline = "e")
+entryHour  = input.int(10, "Entry time ET (hour)", minval = 0, maxval = 23, group = grpS, inline = "e")
 entryMin   = input.int(0, "min", minval = 0, maxval = 59, group = grpS, inline = "e")
 flatHour   = input.int(15, "Flatten time ET (hour)", minval = 0, maxval = 23, group = grpS, inline = "f")
 flatMin    = input.int(58, "min", minval = 0, maxval = 59, group = grpS, inline = "f")
@@ -32,9 +32,20 @@ allowShort = input.bool(true, "Allow shorts", group = grpS)
 skipDates  = input.string("2026-11-26,2026-11-27,2026-12-24,2026-12-25,2026-12-31,2027-01-01",
      "Skip dates (holidays / early closes, YYYY-MM-DD)", group = grpS)
 
-grpR = "Risk"
+grpR = "Prop firm rules (Tradeify 50K Growth)"
 dailyLossLimit = input.float(1250, "Daily loss limit ($)", group = grpR,
-     tooltip = "Tradeify 50K Growth soft daily loss limit. The script refuses to run if contracts x stop x point value exceeds it.")
+     tooltip = "Soft daily loss limit. The script refuses to run if contracts x stop x point value exceeds it.")
+evalStart      = input.time(timestamp("2020-01-01T00:00:00"), "Evaluation start date", group = grpR,
+     tooltip = "Set this to the day your evaluation (or funded account) started before going live. Profit, drawdown and target are tracked from here.")
+startBalance   = input.float(0, "Profit already made before start ($)", group = grpR,
+     tooltip = "If you start the bot mid-evaluation, enter your current profit (e.g. 450 or -300).")
+startPeak      = input.float(0, "Highest end-of-day profit so far ($)", group = grpR,
+     tooltip = "Your best end-of-day profit so far in this evaluation (0 if new). The drawdown floor trails this.")
+trailDD        = input.float(2000, "Trailing drawdown, end-of-day ($)", group = grpR)
+profitTarget   = input.float(3000, "Profit target ($)", group = grpR)
+stopAtTarget   = input.bool(true, "Stop trading once the target is reached", group = grpR)
+ddGuard        = input.bool(false, "Drawdown guard (recommended for FUNDED accounts)", group = grpR,
+     tooltip = "Trade fewer contracts when a full stop-out would breach the trailing drawdown, and skip the day if even 1 contract does not fit. In an evaluation this lowered the simulated pass rate, so it is off by default.")
 
 grpA = "TradersPost"
 tpTicker  = input.string("MNQZ2026", "TradersPost ticker (ROOT+MONTH+YEAR)", group = grpA,
@@ -60,6 +71,25 @@ if barstate.isfirst and maxTradeLoss > dailyLossLimit
     runtime.error("Max loss per trade $" + str.tostring(maxTradeLoss) + " exceeds the daily loss limit $" +
          str.tostring(dailyLossLimit) + ". Lower contracts or the stop.")
 
+// ---------- prop-firm tracking (end-of-day trailing drawdown, profit target) ----------
+var float baseEquity = na
+var float eodPeak    = na
+inEval = time >= evalStart
+if inEval and na(baseEquity)
+    baseEquity := strategy.equity - startBalance
+    eodPeak    := math.max(startPeak, startBalance)
+evalPnl = inEval ? strategy.equity - baseEquity : 0.0
+// record the end-of-day balance on the first bar closing at/after 16:00 ET (the bot is flat by then)
+if inEval and closeMins >= 16 * 60 and closeMins[1] < 16 * 60
+    eodPeak := math.max(eodPeak, evalPnl)
+ddFloor   = na(eodPeak) ? -trailDD : eodPeak - trailDD
+targetHit = inEval and evalPnl >= profitTarget
+roomLeft  = evalPnl - ddFloor          // $ left before the drawdown is breached
+perLot    = stopPts * syminfo.pointvalue + 2 * 0.75   // worst loss per contract incl. commission
+fitQty    = math.min(qty, int(math.floor((roomLeft - 50) / perLot)))
+tradeQty  = ddGuard ? fitQty : qty
+propOK    = inEval and tradeQty >= 1 and not (stopAtTarget and targetHit)
+
 // ---------- session state ----------
 var float globexOpen     = na
 var int   globexOpenTime = na
@@ -76,25 +106,25 @@ globexFresh = not na(globexOpenTime) and time - globexOpenTime < 24 * 60 * 60 * 
 // ---------- TradersPost messages ----------
 entryJson(string action, string sentiment, float stopPrice) =>
     '{"ticker":"' + tpTicker + '","action":"' + action + '","sentiment":"' + sentiment +
-     '","quantity":' + str.tostring(qty) + ',"orderType":"market","signalPrice":' +
+     '","quantity":' + str.tostring(tradeQty) + ',"orderType":"market","signalPrice":' +
      str.tostring(close, format.mintick) + ',"stopLoss":{"type":"stop","stopPrice":' +
      str.tostring(stopPrice, format.mintick) + '}}'
 exitJson() => '{"ticker":"' + tpTicker + '","action":"exit"}'
 
 // ---------- entry at the first bar closing at/after the entry time ----------
 atEntryTime = closeMins >= entryMins and closeMins[1] < entryMins and closeMins < flatMins
-canEnter = atEntryTime and isWeekday and globexFresh and not tradedToday and
+canEnter = atEntryTime and isWeekday and globexFresh and not tradedToday and propOK and
      strategy.position_size == 0 and not str.contains(skipDates, dateStr)
 
 if canEnter
     move = close - globexOpen
     if move > 0 and allowLong
         sp = math.round_to_mintick(close - stopPts)
-        strategy.entry("Long", strategy.long, qty = qty, alert_message = entryJson("buy", "bullish", sp))
+        strategy.entry("Long", strategy.long, qty = tradeQty, alert_message = entryJson("buy", "bullish", sp))
         strategy.exit("Long stop", "Long", stop = sp, alert_message = exitJson())
     else if move < 0 and allowShort
         sp = math.round_to_mintick(close + stopPts)
-        strategy.entry("Short", strategy.short, qty = qty, alert_message = entryJson("sell", "bearish", sp))
+        strategy.entry("Short", strategy.short, qty = tradeQty, alert_message = entryJson("sell", "bearish", sp))
         strategy.exit("Short stop", "Short", stop = sp, alert_message = exitJson())
     tradedToday := true
 
@@ -102,7 +132,7 @@ if canEnter
 if strategy.position_size != 0 and closeMins >= flatMins and closeMins < 17 * 60
     strategy.close_all(comment = "EOD flat", alert_message = exitJson())
 
-// Belt-and-braces: always send an exit near the 16:59 ET Tradeify cutoff, even if the
+// Always send an exit near the 16:59 ET Tradeify cutoff, even if the
 // script thinks it is already flat (protects against a missed exit alert).
 if isWeekday and closeMins >= safeMins and closeMins[1] < safeMins
     alert(exitJson(), alert.freq_once_per_bar_close)
@@ -111,7 +141,7 @@ if isWeekday and closeMins >= safeMins and closeMins[1] < safeMins
 plot(globexFresh ? globexOpen : na, "Globex open (18:00 ET)", color.new(color.orange, 0), 1, plot.style_linebr)
 bgcolor(strategy.position_size > 0 ? color.new(color.green, 90) : strategy.position_size < 0 ? color.new(color.red, 90) : na)
 
-var table info = table.new(position.top_right, 2, 3, border_width = 1)
+var table info = table.new(position.top_right, 2, 8, border_width = 1)
 if barstate.islast
     table.cell(info, 0, 0, "Globex open", text_size = size.small)
     table.cell(info, 1, 0, na(globexOpen) ? "not seen — turn ON extended hours" : str.tostring(globexOpen, format.mintick), text_size = size.small)
@@ -119,3 +149,14 @@ if barstate.islast
     table.cell(info, 1, 1, "$" + str.tostring(maxTradeLoss, "#,###"), text_size = size.small)
     table.cell(info, 0, 2, "TradersPost ticker", text_size = size.small)
     table.cell(info, 1, 2, tpTicker, text_size = size.small)
+    table.cell(info, 0, 3, "Eval P&L", text_size = size.small)
+    table.cell(info, 1, 3, inEval ? "$" + str.tostring(evalPnl, "#,##0") : "starts " + str.format_time(evalStart, "yyyy-MM-dd", TZ), text_size = size.small)
+    table.cell(info, 0, 4, "Drawdown floor", text_size = size.small)
+    table.cell(info, 1, 4, inEval ? "$" + str.tostring(ddFloor, "#,##0") + " (room $" + str.tostring(roomLeft, "#,##0") + ")" : "-", text_size = size.small)
+    table.cell(info, 0, 5, "Target", text_size = size.small)
+    table.cell(info, 1, 5, "$" + str.tostring(profitTarget, "#,##0") + (targetHit ? " REACHED" : ""), text_size = size.small)
+    table.cell(info, 0, 6, "Trading", text_size = size.small)
+    table.cell(info, 1, 6, propOK ? "ON" : not inEval ? "OFF (before eval start)" : targetHit and stopAtTarget ? "OFF (target reached)" : "OFF (too close to drawdown floor)",
+         text_color = propOK ? color.green : color.red, text_size = size.small)
+    table.cell(info, 0, 7, "Next size", text_size = size.small)
+    table.cell(info, 1, 7, str.tostring(math.max(tradeQty, 0)) + " MNQ" + (ddGuard ? " (guard on)" : ""), text_size = size.small)

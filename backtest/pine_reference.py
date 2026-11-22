@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "nasdaq_data" / "nq_futures_5m.csv"
 OUT = ROOT / "backtest" / "expected_trades.csv"
 
-ENTRY_MINS, FLAT_MINS, STOP_PTS, GLOBEX_MINS = 13 * 60, 15 * 60 + 58, 300.0, 18 * 60
+ENTRY_MINS, FLAT_MINS, STOP_PTS, GLOBEX_MINS = 10 * 60, 15 * 60 + 58, 300.0, 18 * 60
 SKIP = {"2026-11-26", "2026-11-27", "2026-12-24", "2026-12-25", "2026-12-31", "2027-01-01"}
 BAR = pd.Timedelta(minutes=5)
 
