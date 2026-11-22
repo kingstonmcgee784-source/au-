@@ -88,7 +88,13 @@ roomLeft  = evalPnl - ddFloor          // $ left before the drawdown is breached
 perLot    = stopPts * syminfo.pointvalue + 2 * 0.75   // worst loss per contract incl. commission
 fitQty    = math.min(qty, int(math.floor((roomLeft - 50) / perLot)))
 tradeQty  = ddGuard ? fitQty : qty
-propOK    = inEval and tradeQty >= 1 and not (stopAtTarget and targetHit)
+// Tradeify closes the account if the balance (including open trades) touches the floor
+var bool breached   = false
+var int  breachTime = na
+if inEval and not breached and not targetHit and evalPnl <= ddFloor
+    breached   := true
+    breachTime := time
+propOK    = inEval and not breached and tradeQty >= 1 and not (stopAtTarget and targetHit)
 
 // ---------- session state ----------
 var float globexOpen     = na
@@ -141,7 +147,7 @@ if isWeekday and closeMins >= safeMins and closeMins[1] < safeMins
 plot(globexFresh ? globexOpen : na, "Globex open (18:00 ET)", color.new(color.orange, 0), 1, plot.style_linebr)
 bgcolor(strategy.position_size > 0 ? color.new(color.green, 90) : strategy.position_size < 0 ? color.new(color.red, 90) : na)
 
-var table info = table.new(position.top_right, 2, 8, border_width = 1)
+var table info = table.new(position.top_right, 2, 9, border_width = 1)
 if barstate.islast
     table.cell(info, 0, 0, "Globex open", text_size = size.small)
     table.cell(info, 1, 0, na(globexOpen) ? "not seen — turn ON extended hours" : str.tostring(globexOpen, format.mintick), text_size = size.small)
@@ -156,7 +162,10 @@ if barstate.islast
     table.cell(info, 0, 5, "Target", text_size = size.small)
     table.cell(info, 1, 5, "$" + str.tostring(profitTarget, "#,##0") + (targetHit ? " REACHED" : ""), text_size = size.small)
     table.cell(info, 0, 6, "Trading", text_size = size.small)
-    table.cell(info, 1, 6, propOK ? "ON" : not inEval ? "OFF (before eval start)" : targetHit and stopAtTarget ? "OFF (target reached)" : "OFF (too close to drawdown floor)",
+    table.cell(info, 1, 6, propOK ? "ON" : not inEval ? "OFF (before eval start)" : breached ? "OFF (drawdown breached)" : targetHit and stopAtTarget ? "OFF (target reached)" : "OFF (too close to drawdown floor)",
          text_color = propOK ? color.green : color.red, text_size = size.small)
     table.cell(info, 0, 7, "Next size", text_size = size.small)
     table.cell(info, 1, 7, str.tostring(math.max(tradeQty, 0)) + " MNQ" + (ddGuard ? " (guard on)" : ""), text_size = size.small)
+    table.cell(info, 0, 8, "Evaluation", text_size = size.small)
+    table.cell(info, 1, 8, breached ? "FAILED — drawdown hit " + str.format_time(breachTime, "yyyy-MM-dd", TZ) : targetHit ? "PASSED" : inEval ? "in progress" : "-",
+         text_color = breached ? color.red : targetHit ? color.green : color.gray, text_size = size.small)
