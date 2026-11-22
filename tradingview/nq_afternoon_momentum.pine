@@ -12,7 +12,7 @@
 // Alert setup: Condition = this strategy, "Order fills and alert() function calls",
 // Message = {{strategy.order.alert_message}}, Webhook URL = your TradersPost webhook.
 strategy("NQ Globex Momentum", overlay = true, process_orders_on_close = true,
-     default_qty_type = strategy.fixed, default_qty_value = 1, initial_capital = 50000,
+     default_qty_type = strategy.fixed, default_qty_value = 3, initial_capital = 50000,
      commission_type = strategy.commission.cash_per_contract, commission_value = 0.75,
      slippage = 2, pyramiding = 0, margin_long = 1, margin_short = 1)
 // margin_* = 1: futures only need a small deposit per contract. Pine v6 defaults to 100%,
@@ -25,8 +25,8 @@ entryHour  = input.int(10, "Entry time ET (hour)", minval = 0, maxval = 23, grou
 entryMin   = input.int(0, "min", minval = 0, maxval = 59, group = grpS, inline = "e")
 flatHour   = input.int(15, "Flatten time ET (hour)", minval = 0, maxval = 23, group = grpS, inline = "f")
 flatMin    = input.int(58, "min", minval = 0, maxval = 59, group = grpS, inline = "f")
-stopPts    = input.float(300, "Protective stop (points)", minval = 1, group = grpS)
-qty        = input.int(1, "Contracts", minval = 1, maxval = 40, group = grpS)
+stopPts    = input.float(200, "Protective stop (points)", minval = 1, group = grpS)
+qty        = input.int(3, "Contracts", minval = 1, maxval = 40, group = grpS)
 allowLong  = input.bool(true, "Allow longs", group = grpS)
 allowShort = input.bool(true, "Allow shorts", group = grpS)
 skipDates  = input.string("2026-11-26,2026-11-27,2026-12-24,2026-12-25,2026-12-31,2027-01-01",
